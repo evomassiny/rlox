@@ -1,0 +1,20 @@
+class  A {
+  a() {
+   print "A";
+ }
+}
+
+class  B < A {
+  a() {
+   print "B";
+ }
+
+ foo() {
+   super.a();
+ }
+}
+
+class C < B {}
+
+print "Should print 'A'";
+C().foo();

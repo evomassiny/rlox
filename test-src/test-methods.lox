@@ -1,0 +1,20 @@
+class Klass {
+
+  init(arg) {
+    this.arg = arg;
+  }
+  printArg() {
+    print this.arg;
+  }
+
+}
+
+fun actuallyAField() {
+  print "this is actually a field, not a method, BUT it's callable anyway.";
+}
+
+var instance = Klass("YO !");
+instance.printArg();
+
+instance.actuallyAField = actuallyAField;
+instance.actuallyAField();

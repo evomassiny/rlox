@@ -1,0 +1,10 @@
+fun this_is_a_function() {
+	var a = 1;
+	print 1;
+}
+
+print this_is_a_function;
+
+this_is_a_function();
+
+print clock();

@@ -1,6 +1,8 @@
-use std::collections::VecDeque;
 use std::str::Chars;
 
+pub const BASE_PEEK_BUFFER_SIZE: usize = 8;
+
+/// All Token variants accepted by the scanner
 #[derive(Debug, PartialEq)]
 pub enum TokenKind {
     // Single-character tokens
@@ -45,11 +47,9 @@ pub enum TokenKind {
     True,
     Var,
     While,
-    Error,
     Eof,
 }
 impl TokenKind {
-    
     /// handcrafted DFA
     fn parse_string(identifier: String) -> Self {
         let mut id = identifier.chars();
@@ -160,9 +160,7 @@ impl TokenKind {
             },
             // 'var'
             Some('v') => {
-                if id.next() == Some('a')
-                    && id.next() == Some('r')
-                {
+                if id.next() == Some('a') && id.next() == Some('r') {
                     return Self::Var;
                 }
             }
@@ -184,7 +182,7 @@ impl TokenKind {
 
 #[derive(Debug, PartialEq)]
 pub enum LexerError {
-    InvalidToken,
+    InvalidToken { span: Span },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -196,8 +194,75 @@ pub struct Span {
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    kind: TokenKind,
-    span: Span,
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+/// This struct is a simple ring buffer,
+/// We use it to store peeked Chars.
+/// It is backed by a small Boxed array, but it might grow as we add
+/// chars into it.
+#[derive(Debug)]
+pub struct PeekBuffer<T> {
+    buffer: Box<[T]>,
+    // index of first slot with content
+    start: usize,
+    // actual content size
+    count: usize,
+}
+impl<T: Copy + Default> PeekBuffer<T> {
+    
+    /// Build a new buffer
+    pub fn new() -> Self {
+        Self {
+            buffer: vec![T::default(); BASE_PEEK_BUFFER_SIZE].into_boxed_slice(),
+            start: 0_usize,
+            count: 0,
+        }
+    }
+
+    /// Number of item in the buffer (!= capacity)
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    /// Add an item at the end of the buffer
+    pub fn push_back(&mut self, item: T) {
+        // if the buffer is full, copy its whole content into a new one, twice as big.
+        if self.count == self.buffer.len() {
+            let new_buffer_size: usize = self.buffer.len() * 2;
+            let mut new_buffer = vec![T::default(); new_buffer_size].into_boxed_slice();
+            for idx in 0..self.count {
+                let item_idx = (self.start + idx) % self.buffer.len();
+                new_buffer[idx] = self.buffer[item_idx];
+            }
+            self.start = 0;
+            self.buffer = new_buffer;
+        }
+        let idx = (self.start + self.count) % self.buffer.len();
+        self.buffer[idx] = item;
+        self.count += 1;
+    }
+
+    /// pop the first item of the buffer
+    pub fn pop_front(&mut self) -> Option<T> {
+        if self.count == 0 {
+            return None;
+        }
+        let item = self.buffer[self.start];
+        self.count -= 1;
+        self.start = (self.start + 1) % self.buffer.len();
+        Some(item)
+    }
+
+    /// get a Ref to the index-th item in the buffer
+    pub fn get<'slf>(&'slf self, index: usize) -> Option<&'slf T> {
+        if index >= self.count {
+            return None;
+        }
+        let idx = (self.start + index) % self.buffer.len();
+        Some(&self.buffer[idx])
+    }
 }
 
 #[derive(Debug)]
@@ -206,7 +271,7 @@ pub struct SourceCursor<'src> {
     line: usize,
     column: usize,
     absolute_index: usize,
-    peeked: VecDeque<Option<char>>,
+    peeked: PeekBuffer<Option<char>>,
 }
 
 impl<'src> SourceCursor<'src> {
@@ -216,7 +281,7 @@ impl<'src> SourceCursor<'src> {
             line: 1,
             column: 1,
             absolute_index: 0,
-            peeked: VecDeque::new(),
+            peeked: PeekBuffer::<Option<char>>::new(),
         }
     }
 
@@ -264,14 +329,12 @@ impl<'src> SourceCursor<'src> {
 
 pub struct Lexer<'src> {
     cursor: SourceCursor<'src>,
-    source: &'src str,
 }
 
 impl<'src> Lexer<'src> {
     pub fn new(source: &'src str) -> Self {
         Self {
             cursor: SourceCursor::new(&*source),
-            source,
         }
     }
 
@@ -433,10 +496,11 @@ impl<'src> Lexer<'src> {
                 });
             }
             '"' => return self.parse_str_literal(),
-            _ => return Err(LexerError::InvalidToken),
+            _ => {
+                return Err(LexerError::InvalidToken {span: self.cursor.span()} );
+            }
         }
     }
-
 
     fn try_parse_alphanumeric(&mut self, c: char) -> Option<Token> {
         if !c.is_ascii_alphabetic() {
@@ -446,11 +510,8 @@ impl<'src> Lexer<'src> {
         identifier.push(c);
         let span = self.cursor.span();
         while let Some(c) = self.cursor.peek(identifier.len() - 1) {
-            if c.is_whitespace() {
-                break;
-            }
             if !c.is_ascii_alphanumeric() {
-                return None;
+                break;
             }
             identifier.push(c);
         }
@@ -510,7 +571,7 @@ impl<'src> Lexer<'src> {
             }
             str_literal.push(c);
         }
-        Err(LexerError::InvalidToken)
+        Err(LexerError::InvalidToken { span })
     }
 }
 
@@ -1003,4 +1064,27 @@ fn should_parse_keyword_tokens() {
             }
         })
     );
+}
+
+#[test]
+fn should_grow_without_issue() {
+    let mut buffer: PeekBuffer<usize> = PeekBuffer::new();
+    // overflow the initial capacity of the ring buffer
+    // assert that the realloaction did not fail
+    for i in 0..(BASE_PEEK_BUFFER_SIZE * 3) {
+        buffer.push_back(i);
+    }
+
+    // check that the values are still there
+    for i in 0..buffer.len() {
+        assert_eq!(*(buffer.get(i).unwrap()), i);
+    }
+
+    // pop all content, in order
+    for i in 0..(BASE_PEEK_BUFFER_SIZE * 3) {
+        let item = buffer.pop_front();
+        assert_eq!(item, Some(i));
+    }
+
+    assert_eq!(buffer.len(), 0);
 }

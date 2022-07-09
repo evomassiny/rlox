@@ -1,0 +1,17 @@
+class Parent {
+   say_hi() {
+      print "hi !";
+      print this;
+   }
+}
+
+class Child < Parent {
+   say_by() {
+      print "by !";
+      print this;
+   }
+}
+
+var child = Child();
+child.say_hi();
+child.say_by();

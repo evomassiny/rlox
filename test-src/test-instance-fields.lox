@@ -1,0 +1,8 @@
+class Klass {}
+
+var a = Klass();
+a.a = 1;
+var b = Klass();
+b.b = 5;
+
+print a.a + b.b;
