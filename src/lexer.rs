@@ -1,6 +1,8 @@
-use std::str::Chars;
+use std::io::Read;
+use std::path::Path;
+use std::fs::File;
+use crate::reader::Utf8BufReader;
 
-pub const BASE_PEEK_BUFFER_SIZE: usize = 8;
 
 /// All Token variants accepted by the scanner
 #[derive(Debug, PartialEq)]
@@ -198,90 +200,22 @@ pub struct Token {
     pub span: Span,
 }
 
-/// This struct is a simple ring buffer,
-/// We use it to store peeked Chars.
-/// It is backed by a small Boxed array, but it might grow as we add
-/// chars into it.
 #[derive(Debug)]
-pub struct PeekBuffer<T> {
-    buffer: Box<[T]>,
-    // index of first slot with content
-    start: usize,
-    // actual content size
-    count: usize,
-}
-impl<T: Copy + Default> PeekBuffer<T> {
-    
-    /// Build a new buffer
-    pub fn new() -> Self {
-        Self {
-            buffer: vec![T::default(); BASE_PEEK_BUFFER_SIZE].into_boxed_slice(),
-            start: 0_usize,
-            count: 0,
-        }
-    }
-
-    /// Number of item in the buffer (!= capacity)
-    pub fn len(&self) -> usize {
-        self.count
-    }
-
-    /// Add an item at the end of the buffer
-    pub fn push_back(&mut self, item: T) {
-        // if the buffer is full, copy its whole content into a new one, twice as big.
-        if self.count == self.buffer.len() {
-            let new_buffer_size: usize = self.buffer.len() * 2;
-            let mut new_buffer = vec![T::default(); new_buffer_size].into_boxed_slice();
-            for idx in 0..self.count {
-                let item_idx = (self.start + idx) % self.buffer.len();
-                new_buffer[idx] = self.buffer[item_idx];
-            }
-            self.start = 0;
-            self.buffer = new_buffer;
-        }
-        let idx = (self.start + self.count) % self.buffer.len();
-        self.buffer[idx] = item;
-        self.count += 1;
-    }
-
-    /// pop the first item of the buffer
-    pub fn pop_front(&mut self) -> Option<T> {
-        if self.count == 0 {
-            return None;
-        }
-        let item = self.buffer[self.start];
-        self.count -= 1;
-        self.start = (self.start + 1) % self.buffer.len();
-        Some(item)
-    }
-
-    /// get a Ref to the index-th item in the buffer
-    pub fn get<'slf>(&'slf self, index: usize) -> Option<&'slf T> {
-        if index >= self.count {
-            return None;
-        }
-        let idx = (self.start + index) % self.buffer.len();
-        Some(&self.buffer[idx])
-    }
-}
-
-#[derive(Debug)]
-pub struct SourceCursor<'src> {
-    source: Chars<'src>,
+pub struct SourceCursor<T> {
+    src: Utf8BufReader<T>,
     line: usize,
     column: usize,
     absolute_index: usize,
-    peeked: PeekBuffer<Option<char>>,
 }
 
-impl<'src> SourceCursor<'src> {
-    fn new(source: &'src str) -> Self {
+impl <T: Read>SourceCursor<T> {
+
+    fn new(src: Utf8BufReader<T>) -> Self {
         Self {
-            source: source.chars(),
             line: 1,
             column: 1,
             absolute_index: 0,
-            peeked: PeekBuffer::<Option<char>>::new(),
+            src: src,
         }
     }
 
@@ -300,15 +234,7 @@ impl<'src> SourceCursor<'src> {
 
     /// read a char and update position
     fn advance(&mut self) -> Option<char> {
-        let maybe_char = {
-            if let Some(maybe_char) = self.peeked.pop_front() {
-                maybe_char
-            } else {
-                self.source.next()
-            }
-        };
-
-        if let Some(c) = maybe_char {
+        if let Some(c) = self.src.next() {
             self.column += 1;
             self.absolute_index += 1;
             return Some(c);
@@ -317,24 +243,29 @@ impl<'src> SourceCursor<'src> {
     }
 
     fn peek(&mut self, index: usize) -> Option<char> {
-        while self.peeked.len() <= index {
-            self.peeked.push_back(self.source.next());
-        }
-        if let Some(Some(c)) = self.peeked.get(index) {
-            return Some(*c);
-        }
-        None
+        self.src.peek(index)
     }
 }
 
-pub struct Lexer<'src> {
-    cursor: SourceCursor<'src>,
+pub struct Lexer<T> {
+    cursor: SourceCursor<T>,
 }
 
-impl<'src> Lexer<'src> {
-    pub fn new(source: &'src str) -> Self {
+impl Lexer<File> {
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let file = File::open(path)?;
+        let reader = Utf8BufReader::new(file);
+        Ok(Self {
+            cursor: SourceCursor::new(reader),
+        })
+    }
+}
+
+impl <T: Read> Lexer<T> {
+    pub fn new(source: Utf8BufReader<T>) -> Self {
         Self {
-            cursor: SourceCursor::new(&*source),
+            cursor: SourceCursor::new(source),
         }
     }
 

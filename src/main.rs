@@ -4,6 +4,8 @@ use std::io::prelude::*;
 use clap::Parser;
 
 mod lexer;
+mod reader;
+mod buffer;
 
 
 /// Simple program to greet a person
@@ -19,15 +21,14 @@ struct Args {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     
-    // read file
-    // TODO: construct some kind of utf8 chars iterator,
-    // so we can compile the script as we're reading it
-    let mut file = File::open(&args.input)?;
-    let mut src = String::new();
-    let _ = file.read_to_string(&mut src)?;
 
+    /*
+     * TODO!
+     * implement Lexer::from_str() to fix tests.
+     * Using some kind of string reader
+     */
     // build a scanner
-    let mut lexer = lexer::Lexer::new(&src);
+    let mut lexer = lexer::Lexer::from_path(&args.input)?;
 
     'scan_loop: loop {
         match lexer.scan_next() {
