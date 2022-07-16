@@ -4,11 +4,10 @@ use std::io::prelude::*;
 use clap::Parser;
 
 mod lexer;
-mod reader;
-mod buffer;
 
+use crate::lexer::{Lexer, TokenKind};
 
-/// Simple program to greet a person
+/// Command line arguments
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -17,16 +16,9 @@ struct Args {
     input: String,
 }
 
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    
 
-    /*
-     * TODO!
-     * implement Lexer::from_str() to fix tests.
-     * Using some kind of string reader
-     */
     // build a scanner
     let mut lexer = lexer::Lexer::from_path(&args.input)?;
 
@@ -34,17 +26,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match lexer.scan_next() {
             Ok(token) => {
                 println!("{:?}", &token);
-                if token.kind == lexer::TokenKind::Eof {
+                if token.kind == TokenKind::Eof {
                     break 'scan_loop;
                 }
-             },
+            }
             Err(e) => {
                 println!("{:?}", e);
                 break 'scan_loop;
             }
         }
     }
-        
-    
+
     Ok(())
 }
