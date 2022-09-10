@@ -1,14 +1,16 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-use clap::Parser;
+use clap::Parser as ArgParser;
 
 mod lexer;
+mod compiler;
 
 use crate::lexer::{Lexer, TokenKind};
+use crate::compiler::Parser;
 
 /// Command line arguments
-#[derive(Parser, Debug)]
+#[derive(ArgParser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Path to a lox file
@@ -36,6 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+
+    let mut lexer = lexer::Lexer::from_path(&args.input)?;
+    let mut parser = Parser::new(&mut lexer);
 
     Ok(())
 }

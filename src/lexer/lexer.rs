@@ -17,11 +17,22 @@ pub struct Token {
     pub span: Span,
 }
 
+/// This struct handle the lexing 
+/// (sometimes called "scanning") of a string input.
+///
+/// It emits `Token` as it's reading  its input.
+///
+/// It is generic over its input, as long as it
+/// implements the `PeekOffset` trait.
+/// This way, it can be used to lex an utf-8 string,
+/// or a file.
 pub struct Lexer<T> {
     input: SourceInput<T>,
 }
 
 impl Lexer<ReaderPeeker<File>> {
+    /// build a Lexer from a file,
+    /// the lexer will lazyly parse as utf-8 the file content when needed.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             input: SourceInput::from_path(path)?,
@@ -30,6 +41,7 @@ impl Lexer<ReaderPeeker<File>> {
 }
 
 impl<'src, const SIZE: usize> Lexer<StrPeeker<'src, { SIZE }>> {
+    /// Build a lexer from an utf-8 string.
     pub fn from_str(src: &'src str) -> Self {
         Self {
             input: SourceInput::from_str(src),
