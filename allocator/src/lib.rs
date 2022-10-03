@@ -1,4 +1,6 @@
+mod bump_blocks;
 use std::alloc::{alloc, dealloc, Layout};
+use std::ops::Add;
 
 /// Align on 2 words boundaries, for simplicity
 pub const ALIGNMENT: usize = std::mem::align_of::<usize>() * 2;
@@ -87,6 +89,46 @@ pub const LINE_SIZE: usize = 1 << LINE_SIZE_BITS;
 /// number of line per block, 256.
 pub const LINE_COUNT: usize = BLOCK_SIZE / LINE_SIZE;
 
+/// an offset address, relative to a `Block` start address
+#[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Clone, Copy)]
+pub struct BlockOffset(usize);
+impl BlockOffset {
+    /// returns the absolute address of the data pointed by `self`
+    pub fn as_ptr(&self, block: &Block) -> *const u8 {
+        unsafe { block.as_ptr().add(self.0) }
+    }
+
+    /// return the index of the line that contains self in a block.
+    pub fn line_index(&self) -> usize {
+        self.0 >> LINE_SIZE_BITS
+    }
+
+    /// return an offset relative to the start of the block,
+    /// from a block line index.
+    pub fn from_line_index(index: usize) -> Self {
+        Self(index << LINE_SIZE_BITS)
+    }
+
+    pub fn in_block(&self) -> bool {
+        self.0 < BLOCK_SIZE
+    }
+}
+
+impl Add<Self> for BlockOffset {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+impl Add<usize> for BlockOffset {
+    type Output = Self;
+
+    fn add(self, other: usize) -> Self {
+        Self(self.0 + other)
+    }
+}
+
 /// Bump allocator, allocates into an underliying `Block` of data.
 /// It divides each blocks into "lines", everytime we allocate an object into
 /// the block, we mark which sections (eg. lines) of the block were affected.
@@ -95,14 +137,15 @@ pub struct BumpBlock {
     /// the next object can be written (in the block)
     /// eg: it point to an "empty" section of data,
     /// the size of this empty section is decribed by `self.limit`
-    cursor: usize,
+    cursor: BlockOffset,
     /// size of the "empty" section pointed by `self.cursor`
-    limit: usize,
+    limit: BlockOffset,
     /// the underlying allocated array
     block: Block,
     /// object that keeps track of which section contain live objects
     meta: Box<BlockMeta>,
 }
+
 
 impl BumpBlock {
     /// returns a pointer to a slice of bytes that can contains an object of `alloc_size`.
@@ -111,7 +154,7 @@ impl BumpBlock {
         // check is the object would fit in the empty slice pointed by self.cursor
         // if so, lookup for the next hole
         while next_bump > self.limit {
-            if next_bump >= BLOCK_SIZE {
+            if !next_bump.in_block() {
                 return None;
             }
             match self.meta.find_next_available_hole(self.limit) {
@@ -125,25 +168,25 @@ impl BumpBlock {
         }
         let offset = self.cursor;
         self.cursor = next_bump;
-        unsafe { Some(self.block.as_ptr().add(offset)) }
+        unsafe { Some(offset.as_ptr(&self.block)) }
     }
 }
 
 /// Keeps tracks of marked lines in a block
 pub struct BlockMeta {
     /// either or not each contains live objects
-    line_mark: [bool; LINE_COUNT],
+    pub line_mark: [bool; LINE_COUNT],
     /// either or not the whole block contains live objects
-    block_mark: bool,
+    pub block_mark: bool,
 }
 impl BlockMeta {
     /// starting from the offset `starting_at` locate the next hole,
     /// return its start and end offset.
-    pub fn find_next_available_hole(&self, starting_at: usize) -> Option<(usize, usize)> {
+    pub fn find_next_available_hole(&self, starting_at: BlockOffset) -> Option<(BlockOffset, BlockOffset)> {
         // looks for a window of N lines which are unmarked
 
         // same as starting_at / LINE_SIZE
-        let mut current_line = starting_at >> LINE_SIZE_BITS;
+        let mut current_line = starting_at.line_index();
 
         // loop over markers, to find the start of an hole
         'scan_for_start: loop {
@@ -160,7 +203,7 @@ impl BlockMeta {
             }
             break;
         }
-        let hole_start = current_line << LINE_SIZE_BITS;
+        let hole_start = BlockOffset::from_line_index(current_line);
 
         // then locate the end of the hole
         let mut hole_size: usize = 1;
@@ -171,14 +214,14 @@ impl BlockMeta {
             }
             hole_size += 1;
         }
-        let hole_end = hole_start + hole_size << LINE_SIZE_BITS;
+        let hole_end = hole_start + BlockOffset::from_line_index(hole_size);
         Some((hole_start, hole_end))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::Block;
+    use crate::{Block, BlockMeta, LINE_COUNT, BlockOffset};
 
     #[test]
     fn alloc_and_dealloc_block() {
@@ -188,5 +231,28 @@ mod tests {
         // be a mutually exclusive set of bits
         let mask = size - 1;
         assert!((block.as_ptr() as usize & mask) ^ mask == mask);
+    }
+
+    #[test]
+    fn hole_lookup() {
+        let mut meta = BlockMeta {
+            line_mark: [false; LINE_COUNT],
+            block_mark: false,
+        };
+        meta.line_mark[10] = true; // mark line as "filled"
+        assert_eq!(
+            meta.find_next_available_hole(BlockOffset(0)),
+            Some((BlockOffset::from_line_index(0), BlockOffset::from_line_index(10))),
+        );
+
+        // assert that a marked line also invalidate the following one.
+        meta.line_mark[15] = true;
+        assert_eq!(
+            meta.find_next_available_hole(BlockOffset::from_line_index(10)), 
+            Some((
+                    BlockOffset::from_line_index(12),
+                    BlockOffset::from_line_index(15),
+                )),
+        );
     }
 }
