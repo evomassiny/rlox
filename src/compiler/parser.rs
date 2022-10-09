@@ -1,7 +1,6 @@
-use crate::lexer::{Token, TokenKind, LexerError, Span, PeekOffset, Lexer};
 use super::compiler::Compiler;
+use crate::lexer::{LexerError, PeekOffset, Span, Token, TokenKind, Tokenize};
 use std::error::Error;
-
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.
@@ -9,138 +8,331 @@ use std::error::Error;
 #[repr(u8)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
-  None = 0,
-  /// =
-  Assignement = 1,
-  /// or
-  Or = 2,
-  /// and
-  And = 3,
-  /// ==, !=
-  Equality = 4,
-  /// <, >, <=, >=
-  Comparison = 5,
-  /// +, -
-  Term = 6,
-  /// *, /
-  Factor = 7,
-  /// !, -
-  Unary = 8,
-  /// . ()
-  Call = 9,
-  Primary = 10,
+    None = 0,
+    /// =
+    Assignement = 1,
+    /// or
+    Or = 2,
+    /// and
+    And = 3,
+    /// ==, !=
+    Equality = 4,
+    /// <, >, <=, >=
+    Comparison = 5,
+    /// +, -
+    Term = 6,
+    /// *, /
+    Factor = 7,
+    /// !, -
+    Unary = 8,
+    /// . ()
+    Call = 9,
+    Primary = 10,
 }
 
+pub enum ParseError {
+    ExpectedToken(String),
+    ScanningError(LexerError),
+    ExpectedExpression,
+    Starved,
+}
 
-pub struct Parser<'a, T> {
-    lexer: &'a mut Lexer<T>,
+fn expression(parser: &mut Parser, _can_assign: bool) -> Result<(), ParseError> {
+    Ok(())
+}
+
+fn grouping(parser: &mut Parser, can_assign: bool) -> Result<(), ParseError> {
+    expression(parser, can_assign)?;
+    parser.consume(TokenKind::RightParen, "Expecting closing parenthesis.")
+}
+
+pub struct Handler {
+    prefix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
+    infix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
+    precedence: Precedence,
+}
+
+fn get_rule(kind: &TokenKind) -> Handler {
+    match kind {
+        &TokenKind::LeftParen => Handler {
+            prefix: Some(grouping),
+            infix: None,
+            precedence: Precedence::Call,
+        },
+        &TokenKind::RightParen => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::LeftBrace => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::RightBrace => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Comma => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Dot => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Minus => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Plus => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Semicolon => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Slash => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Star => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Bang => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::BangEqual => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Equal => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::EqualEqual => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Greater => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::GreaterEqual => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Less => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::LessEqual => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Identifier(_) => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Str(_) => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Number(_) => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::And => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Class => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Else => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::False => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Fun => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::For => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::If => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Nil => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Or => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Print => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Return => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Super => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::This => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::True => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Var => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::While => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+        &TokenKind::Eof => Handler {
+            prefix: None,
+            infix: None,
+            precedence: Precedence::None,
+        },
+    }
+}
+
+pub struct Parser {
+    lexer: Box<dyn Tokenize>,
     /// emits bytecode
     compiler: Compiler,
     current: Option<Token>,
     previous: Option<Token>,
-    had_error: bool,
-    panic_mode: bool,
 }
 
-impl <'a, T: PeekOffset> Parser<'a, T> {
-
-    pub fn new(lexer: &'a mut Lexer<T>) -> Self {
+impl Parser {
+    pub fn new(lexer: Box<dyn Tokenize>) -> Self {
         Self {
             lexer,
             compiler: Compiler::new(),
             current: None,
             previous: None,
-            had_error: false,
-            panic_mode: false,
         }
     }
 
-    fn advance(&mut self) -> Result<(), LexerError> {
+    fn advance(&mut self) -> Result<(), ParseError> {
         self.previous = self.current.take();
-        self.current = Some(self.lexer.scan_next()?);
+        self.current = Some(
+            self.lexer
+                .scan_next()
+                .map_err(|e| ParseError::ScanningError(e))?,
+        );
         Ok(())
     }
+    fn current<'a>(&'a self) -> Result<&'a Token, ParseError> {
+        self.current.as_ref().ok_or(ParseError::Starved)
+    }
+    fn previous<'a>(&'a self) -> Result<&'a Token, ParseError> {
+        self.previous.as_ref().ok_or(ParseError::Starved)
+    }
 
-    /// Parse the start of statement/expression
-    fn parse_prefix(&mut self, kind: TokenKind, can_assign: bool) -> Result<(), ()> {
-        // mimic the first element of the `ParseRule` C-struct
-        match kind {
-            TokenKind::LeftParen=> todo!(),
-            TokenKind::RightParen=> todo!(),
-            TokenKind::LeftBrace=> todo!(),
-            TokenKind::RightBrace=> todo!(),
-            TokenKind::Comma=> todo!(),
-            TokenKind::Dot=> todo!(),
-            TokenKind::Minus=> todo!(),
-            TokenKind::Plus=> todo!(),
-            TokenKind::Semicolon=> todo!(),
-            TokenKind::Slash=> todo!(),
-            TokenKind::Star=> todo!(),
-            TokenKind::Bang=> todo!(),
-            TokenKind::BangEqual=> todo!(),
-            TokenKind::Equal=> todo!(),
-            TokenKind::EqualEqual=> todo!(),
-            TokenKind::Greater=> todo!(),
-            TokenKind::GreaterEqual=> todo!(),
-            TokenKind::Less=> todo!(),
-            TokenKind::LessEqual=> todo!(),
-            TokenKind::Identifier(_)=> todo!(),
-            TokenKind::Str(_)=> todo!(),
-            TokenKind::Number(_)=> todo!(),
-            TokenKind::And=> todo!(),
-            TokenKind::Class=> todo!(),
-            TokenKind::Else=> todo!(),
-            TokenKind::False=> todo!(),
-            TokenKind::Fun=> todo!(),
-            TokenKind::For=> todo!(),
-            TokenKind::If=> todo!(),
-            TokenKind::Nil=> todo!(),
-            TokenKind::Or=> todo!(),
-            TokenKind::Print=> todo!(),
-            TokenKind::Return=> todo!(),
-            TokenKind::Super=> todo!(),
-            TokenKind::This=> todo!(),
-            TokenKind::True=> todo!(),
-            TokenKind::Var=> todo!(),
-            TokenKind::While=> todo!(),
-            TokenKind::Eof=> todo!(),
+    fn consume(&mut self, kind: TokenKind, err_msg: &str) -> Result<(), ParseError> {
+        let token = self
+            .lexer
+            .scan_next()
+            .map_err(|e| ParseError::ScanningError(e))?;
+        if !matches!(token.kind, kind) {
+            return Err(ParseError::ExpectedToken(err_msg.into()));
         }
         Ok(())
     }
 
+    fn check(&self, kind: TokenKind) -> Result<bool, ParseError> {
+        matches!(kind, self.current()?.kind)
+    }
+
+    fn matches(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+        if !self.check(kind)? {
+            return Ok(false);
+        }
+        let _ = self.advance()?;
+        Ok(true)
+    }
+
+    pub fn parsePrecedence(&mut self) -> Result<(), ParseError> {
+        let _ = self.advance()?;
+        let mut rule = get_rule(&self.current()?.kind);
+        let precedence = rule.precedence;
+        let can_assign: bool = rule.precedence < Precedence::Assignement;
+
+        // call the rule associated with handling
+        // expressing **STARTING** with this token
+        let prefix_fn = rule.prefix.ok_or(ParseError::ExpectedExpression)?;
+        prefix_fn(self, can_assign)?;
+
+        while precedence <= rule.precedence {
+            let _ = self.advance()?;
+            // call the rule associated with handling
+            // expressing **CONTAINING** this token
+            rule = get_rule(&self.previous()?.kind);
+            let infix_fn = rule.infix.ok_or(ParseError::ExpectedExpression)?;
+            infix_fn(self, can_assign)?;
+        }
+        if can_assign && self.matches(TokenKind::Equal)? {
+            return Err(ParseError::ExpectedToken(
+                "Invalid assignement target.".into(),
+            ));
+        }
+        Ok(())
+    }
 }
-
-/*
-/**
- * Parse all expression until we reach a token associated
- * with an higher precedence than `precedence`.
- *
- * Assumes that the first token is the starting point of a
- * prefix expression.
- */
-static void parsePrecendence(Precedence precedence) {
-  advance();
-  ParseFn prefixRule = getRule(parser.previous.type)->prefix;
-  if (prefixRule == NULL) {
-    error("Expect expression.");
-    return;
-  }
-
-  bool canAssign = precedence <= PREC_ASSIGNMENT;
-  // call the rule associated with handling
-  // expressing **STARTING** with this token
-  prefixRule(canAssign);
-
-  while (precedence <= getRule(parser.current.type)->precedence) {
-    advance();
-    ParseFn infixRule = getRule(parser.previous.type)->infix;
-    // call the rule associated with handling
-    // expressing **CONTAINING** this token
-    infixRule(canAssign);
-  }
-
-  if (canAssign && match(TOKEN_EQUAL)) {
-    error("Invalid assignement target.");
-  }
-}
-*/

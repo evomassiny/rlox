@@ -57,7 +57,86 @@ impl<T: PeekOffset> Lexer<T> {
         false
     }
 
-    pub fn scan_next(&mut self) -> Result<Token, LexerError> {
+
+    fn try_parse_alphanumeric(&mut self, c: char) -> Option<Token> {
+        if !c.is_ascii_alphabetic() {
+            return None;
+        }
+        let mut identifier = String::new();
+        identifier.push(c);
+        let span = self.input.span();
+        while let Some(c) = self.input.peek(identifier.len() - 1) {
+            if !c.is_ascii_alphanumeric() {
+                break;
+            }
+            identifier.push(c);
+        }
+        for _ in 0..identifier.len() {
+            self.input.advance();
+        }
+        Some(Token {
+            kind: TokenKind::parse_string(identifier),
+            span,
+        })
+    }
+
+    fn try_parse_number(&mut self, c: char) -> Option<Token> {
+        if !c.is_ascii_digit() {
+            return None;
+        }
+        let mut identifier = String::new();
+        identifier.push(c);
+        let span = self.input.span();
+        while let Some(c) = self.input.peek(identifier.len() - 1) {
+            if c.is_whitespace() {
+                break;
+            }
+            identifier.push(c);
+            if !c.is_ascii_digit() {
+                if c == '.' {
+                    while let Some(cc) = self.input.peek(identifier.len() - 1) {
+                        if cc.is_whitespace() {
+                            break;
+                        }
+                        identifier.push(cc);
+                    }
+                    break;
+                } else {
+                    return None;
+                }
+            }
+        }
+        for _ in 0..identifier.len() {
+            self.input.advance();
+        }
+        Some(Token {
+            kind: TokenKind::Number(identifier.parse().unwrap()),
+            span,
+        })
+    }
+
+    fn parse_str_literal(&mut self) -> Result<Token, LexerError> {
+        let span = self.input.span();
+        let mut str_literal = String::new();
+        while let Some(c) = self.input.advance() {
+            if c == '"' {
+                return Ok(Token {
+                    kind: TokenKind::Str(str_literal),
+                    span,
+                });
+            }
+            str_literal.push(c);
+        }
+        Err(LexerError::InvalidToken { span })
+    }
+}
+
+pub trait Tokenize {
+    fn scan_next(&mut self) -> Result<Token, LexerError>;
+}
+
+impl <T: PeekOffset> Tokenize for Lexer<T> {
+    fn scan_next(&mut self) -> Result<Token, LexerError> {
         // read next non-whitespace character
         let c: char = {
             loop {
@@ -215,79 +294,9 @@ impl<T: PeekOffset> Lexer<T> {
             }
         }
     }
-
-    fn try_parse_alphanumeric(&mut self, c: char) -> Option<Token> {
-        if !c.is_ascii_alphabetic() {
-            return None;
-        }
-        let mut identifier = String::new();
-        identifier.push(c);
-        let span = self.input.span();
-        while let Some(c) = self.input.peek(identifier.len() - 1) {
-            if !c.is_ascii_alphanumeric() {
-                break;
-            }
-            identifier.push(c);
-        }
-        for _ in 0..identifier.len() {
-            self.input.advance();
-        }
-        Some(Token {
-            kind: TokenKind::parse_string(identifier),
-            span,
-        })
-    }
-
-    fn try_parse_number(&mut self, c: char) -> Option<Token> {
-        if !c.is_ascii_digit() {
-            return None;
-        }
-        let mut identifier = String::new();
-        identifier.push(c);
-        let span = self.input.span();
-        while let Some(c) = self.input.peek(identifier.len() - 1) {
-            if c.is_whitespace() {
-                break;
-            }
-            identifier.push(c);
-            if !c.is_ascii_digit() {
-                if c == '.' {
-                    while let Some(cc) = self.input.peek(identifier.len() - 1) {
-                        if cc.is_whitespace() {
-                            break;
-                        }
-                        identifier.push(cc);
-                    }
-                    break;
-                } else {
-                    return None;
-                }
-            }
-        }
-        for _ in 0..identifier.len() {
-            self.input.advance();
-        }
-        Some(Token {
-            kind: TokenKind::Number(identifier.parse().unwrap()),
-            span,
-        })
-    }
-
-    fn parse_str_literal(&mut self) -> Result<Token, LexerError> {
-        let span = self.input.span();
-        let mut str_literal = String::new();
-        while let Some(c) = self.input.advance() {
-            if c == '"' {
-                return Ok(Token {
-                    kind: TokenKind::Str(str_literal),
-                    span,
-                });
-            }
-            str_literal.push(c);
-        }
-        Err(LexerError::InvalidToken { span })
-    }
 }
+
+
 
 #[test]
 fn should_parse_static_tokens() {

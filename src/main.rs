@@ -6,7 +6,7 @@ use clap::Parser as ArgParser;
 mod lexer;
 mod compiler;
 
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::{Lexer, TokenKind, Tokenize};
 use crate::compiler::Parser;
 
 /// Command line arguments
@@ -39,8 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let mut lexer = lexer::Lexer::from_path(&args.input)?;
-    let mut parser = Parser::new(&mut lexer);
+    let lexer = lexer::Lexer::from_path(&args.input)?;
+    let mut parser = Parser::new(Box::new(lexer));
 
     Ok(())
 }
