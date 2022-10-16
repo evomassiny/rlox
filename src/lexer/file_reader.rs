@@ -1,9 +1,7 @@
-use super::ring_buffer::{BufferFull, RingBuffer};
+use super::ring_buffer::RingBuffer;
 use super::source::{PeekOffset, ReadError};
-use std::fs::File;
+
 use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::Path;
 
 /// try to parse utf-8 by batch of 128 bytes
 const PARSE_BUFFER_SIZE: usize = 128;
@@ -74,10 +72,8 @@ impl<T: Read> PeekOffset for ReaderPeeker<T> {
         if n >= self.chars.len() {
             return Err(ReadError::PeekTooFar);
         }
-        if self.chars.len() < n {
-            if self.parse_batch().is_err() {
-                return Err(ReadError::IoError);
-            }
+        if self.chars.len() < n && self.parse_batch().is_err() {
+            return Err(ReadError::IoError);
         }
         Ok(self.chars.get(n))
     }
@@ -90,7 +86,7 @@ impl<T: Read> PeekOffset for ReaderPeeker<T> {
     }
 
     fn capacity(&self) -> usize {
-        return self.chars.capacity();
+        self.chars.capacity()
     }
 }
 

@@ -3,7 +3,7 @@ use super::source::{PeekOffset, SourceInput, Span};
 use super::str_reader::StrPeeker;
 use super::token::TokenKind;
 use std::fs::File;
-use std::io::Read;
+
 use std::path::Path;
 
 #[derive(Debug, PartialEq)]
@@ -17,7 +17,7 @@ pub struct Token {
     pub span: Span,
 }
 
-/// This struct handle the lexing 
+/// This struct handle the lexing
 /// (sometimes called "scanning") of a string input.
 ///
 /// It emits `Token` as it's reading  its input.
@@ -56,7 +56,6 @@ impl<T: PeekOffset> Lexer<T> {
         }
         false
     }
-
 
     fn try_parse_alphanumeric(&mut self, c: char) -> Option<Token> {
         if !c.is_ascii_alphabetic() {
@@ -135,7 +134,7 @@ pub trait Tokenize {
     fn scan_next(&mut self) -> Result<Token, LexerError>;
 }
 
-impl <T: PeekOffset> Tokenize for Lexer<T> {
+impl<T: PeekOffset> Tokenize for Lexer<T> {
     fn scan_next(&mut self) -> Result<Token, LexerError> {
         // read next non-whitespace character
         let c: char = {
@@ -164,72 +163,50 @@ impl <T: PeekOffset> Tokenize for Lexer<T> {
             return Ok(token);
         }
         match c {
-            '(' => {
-                return Ok(Token {
-                    kind: TokenKind::LeftParen,
-                    span: self.input.span(),
-                })
-            }
-            ')' => {
-                return Ok(Token {
-                    kind: TokenKind::RightParen,
-                    span: self.input.span(),
-                })
-            }
-            '{' => {
-                return Ok(Token {
-                    kind: TokenKind::LeftBrace,
-                    span: self.input.span(),
-                })
-            }
-            '}' => {
-                return Ok(Token {
-                    kind: TokenKind::RightBrace,
-                    span: self.input.span(),
-                })
-            }
-            ';' => {
-                return Ok(Token {
-                    kind: TokenKind::Semicolon,
-                    span: self.input.span(),
-                })
-            }
-            ',' => {
-                return Ok(Token {
-                    kind: TokenKind::Comma,
-                    span: self.input.span(),
-                })
-            }
-            '.' => {
-                return Ok(Token {
-                    kind: TokenKind::Dot,
-                    span: self.input.span(),
-                })
-            }
-            '-' => {
-                return Ok(Token {
-                    kind: TokenKind::Minus,
-                    span: self.input.span(),
-                })
-            }
-            '+' => {
-                return Ok(Token {
-                    kind: TokenKind::Plus,
-                    span: self.input.span(),
-                })
-            }
-            '/' => {
-                return Ok(Token {
-                    kind: TokenKind::Slash,
-                    span: self.input.span(),
-                })
-            }
-            '*' => {
-                return Ok(Token {
-                    kind: TokenKind::Star,
-                    span: self.input.span(),
-                })
-            }
+            '(' => Ok(Token {
+                kind: TokenKind::LeftParen,
+                span: self.input.span(),
+            }),
+            ')' => Ok(Token {
+                kind: TokenKind::RightParen,
+                span: self.input.span(),
+            }),
+            '{' => Ok(Token {
+                kind: TokenKind::LeftBrace,
+                span: self.input.span(),
+            }),
+            '}' => Ok(Token {
+                kind: TokenKind::RightBrace,
+                span: self.input.span(),
+            }),
+            ';' => Ok(Token {
+                kind: TokenKind::Semicolon,
+                span: self.input.span(),
+            }),
+            ',' => Ok(Token {
+                kind: TokenKind::Comma,
+                span: self.input.span(),
+            }),
+            '.' => Ok(Token {
+                kind: TokenKind::Dot,
+                span: self.input.span(),
+            }),
+            '-' => Ok(Token {
+                kind: TokenKind::Minus,
+                span: self.input.span(),
+            }),
+            '+' => Ok(Token {
+                kind: TokenKind::Plus,
+                span: self.input.span(),
+            }),
+            '/' => Ok(Token {
+                kind: TokenKind::Slash,
+                span: self.input.span(),
+            }),
+            '*' => Ok(Token {
+                kind: TokenKind::Star,
+                span: self.input.span(),
+            }),
             '!' => {
                 let span = self.input.span();
                 if self.next_char_match('=') {
@@ -239,10 +216,10 @@ impl <T: PeekOffset> Tokenize for Lexer<T> {
                         span,
                     });
                 }
-                return Ok(Token {
+                Ok(Token {
                     kind: TokenKind::Bang,
                     span,
-                });
+                })
             }
             '=' => {
                 let span = self.input.span();
@@ -253,10 +230,10 @@ impl <T: PeekOffset> Tokenize for Lexer<T> {
                         span,
                     });
                 }
-                return Ok(Token {
+                Ok(Token {
                     kind: TokenKind::Equal,
                     span,
-                });
+                })
             }
             '<' => {
                 let span = self.input.span();
@@ -267,10 +244,10 @@ impl <T: PeekOffset> Tokenize for Lexer<T> {
                         span,
                     });
                 }
-                return Ok(Token {
+                Ok(Token {
                     kind: TokenKind::Less,
                     span,
-                });
+                })
             }
             '>' => {
                 let span = self.input.span();
@@ -281,22 +258,18 @@ impl <T: PeekOffset> Tokenize for Lexer<T> {
                         span,
                     });
                 }
-                return Ok(Token {
+                Ok(Token {
                     kind: TokenKind::Greater,
                     span,
-                });
+                })
             }
-            '"' => return self.parse_str_literal(),
-            _ => {
-                return Err(LexerError::InvalidToken {
-                    span: self.input.span(),
-                });
-            }
+            '"' => self.parse_str_literal(),
+            _ => Err(LexerError::InvalidToken {
+                span: self.input.span(),
+            }),
         }
     }
 }
-
-
 
 #[test]
 fn should_parse_static_tokens() {

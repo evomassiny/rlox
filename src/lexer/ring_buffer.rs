@@ -74,7 +74,7 @@ impl<const SIZE: usize, T: Copy> RingBuffer<SIZE, T> {
     }
 
     pub fn capacity(&self) -> usize {
-        return SIZE;
+        SIZE
     }
 }
 

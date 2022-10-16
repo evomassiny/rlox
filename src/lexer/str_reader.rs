@@ -1,4 +1,4 @@
-use super::ring_buffer::{BufferFull, RingBuffer};
+use super::ring_buffer::RingBuffer;
 use super::source::{PeekOffset, ReadError};
 use std::str::Chars;
 
@@ -42,6 +42,6 @@ impl<'src, const SIZE: usize> PeekOffset for StrPeeker<'src, { SIZE }> {
     }
 
     fn capacity(&self) -> usize {
-        return SIZE;
+        SIZE
     }
 }
