@@ -258,16 +258,19 @@ fn hole_lookup() {
     meta.line_mark[10] = true; // mark line as "filled"
     assert_eq!(
         meta.find_next_available_hole(BlockOffset::new(0)),
-        Some((BlockOffset::from_line_index(0), BlockOffset::from_line_index(10))),
+        Some((
+            BlockOffset::from_line_index(0),
+            BlockOffset::from_line_index(10)
+        )),
     );
 
     // assert that a marked line also invalidate the following one.
     meta.line_mark[15] = true;
     assert_eq!(
-        meta.find_next_available_hole(BlockOffset::from_line_index(10)), 
+        meta.find_next_available_hole(BlockOffset::from_line_index(10)),
         Some((
-                BlockOffset::from_line_index(12),
-                BlockOffset::from_line_index(15),
-            )),
+            BlockOffset::from_line_index(12),
+            BlockOffset::from_line_index(15),
+        )),
     );
 }
