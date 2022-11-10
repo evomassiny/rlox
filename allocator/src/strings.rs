@@ -1,73 +1,54 @@
+use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
-use crate::header::Header;
+use crate::heap_objects::Header;
+use std::convert::AsRef;
 
-const OFFSET_TO_HEADER: usize = 0; 
-
-/// TODO:  FIX this offset
-const OFFSET_TO_LENGTH: usize = 
-    OFFSET_TO_HEADER
-    + std::mem::size_of::<Header>()  // `header` size
-    + (
-        std::mem::align_of::<usize>() - (std::mem::size_of::<Header>() % std::mem::align_of::<usize>())
-    ); // padding between `header` and `length`
-const OFFSET_TO_BUFFER: usize = 
-    OFFSET_TO_LENGTH
-    + std::mem::size_of::<usize>() // `length` size
-    + (
-        std::mem::align_of::<u8>() - (std::mem::size_of::<usize>() % std::mem::align_of::<u8>())
-    ); // padding between `length` and the first element of the char array
+/// Offset to start of the different fields of `Str`,
+/// relative to the start of an `Str` struct.
+/// (This works because of #[repr(C)])
+const OFFSET_TO_HEADER: usize = 0;
+const OFFSET_TO_LENGTH: usize = OFFSET_TO_HEADER + padded_offset::<Header, usize>();
+const OFFSET_TO_BUFFER: usize = OFFSET_TO_LENGTH + padded_offset::<usize, u8>();
 
 /// data is written directly after `length`
 #[derive(Debug, PartialEq)]
 #[repr(C)]
 pub struct Str {
-    pub (crate) header: Header,
+    pub(crate) header: Header,
     /// length of the string, in bytes !
-    pub length: usize,
+    length: usize,
 }
 
-
 impl Str {
-
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, HeapError> where 'heap: 'a {
+    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, HeapError>
+    where
+        'heap: 'a,
+    {
         let bytes = value.as_bytes();
         let size: usize = OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
         let ptr = heap.alloc(size)?;
         unsafe {
             // write `header`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header::Str,
-            );
+            std::ptr::write(ptr.add(OFFSET_TO_HEADER) as *mut Header, Header::Str);
             // write `length`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_LENGTH) as *mut usize,
-                bytes.len(),
-            );
-            dbg!(ptr.add(OFFSET_TO_LENGTH) as *mut usize);
-            dbg!(* ptr.add(OFFSET_TO_LENGTH) as *mut usize);
+            std::ptr::write(ptr.add(OFFSET_TO_LENGTH) as *mut usize, bytes.len());
             // write byte array
             std::ptr::copy_nonoverlapping(
                 bytes.as_ptr(),
                 ptr.add(OFFSET_TO_BUFFER) as *mut u8,
                 bytes.len(),
             );
-            dbg!( ptr.add(OFFSET_TO_BUFFER));
             let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
             Ok(obj_ref)
         }
     }
+}
 
-    pub fn as_str<'s>(&'s self) -> &'s str {
+impl AsRef<str> for Str {
+    fn as_ref(&self) -> &str {
+        let self_ptr = self as *const _ as *const u8;
         unsafe {
-            let self_ptr = std::mem::transmute::<&'s Self, *const u8>(self);
-            dbg!(self_ptr.add(OFFSET_TO_BUFFER));
-            dbg!(self_ptr.add(OFFSET_TO_LENGTH));
-            dbg!(self.length);
-            let slice = std::slice::from_raw_parts(
-                self_ptr.add(OFFSET_TO_BUFFER),
-                self.length,
-            );
+            let slice = std::slice::from_raw_parts(self_ptr.add(OFFSET_TO_BUFFER), self.length);
             std::str::from_utf8_unchecked(slice)
         }
     }
@@ -78,6 +59,4 @@ impl Drop for Str {
     fn drop(&mut self) {
         std::mem::forget(self);
     }
-
 }
-

@@ -6,6 +6,7 @@ pub enum HeapError {
     TooBig,
 }
 
+/// GC-ed Heap
 pub struct Heap {
     blocks: Vec<BumpBlock>,
 }
@@ -35,5 +36,4 @@ impl Heap {
         self.blocks.push(block);
         Ok(address)
     }
-
 }

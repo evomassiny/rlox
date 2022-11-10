@@ -1,49 +1,75 @@
+use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
-use crate::header::Header;
+use crate::heap_objects::Header;
+use std::convert::{AsMut, AsRef, Into};
 
-const OFFSET_TO_HEADER: usize = 0; 
-const OFFSET_TO_DATA: usize = 
-    OFFSET_TO_HEADER
-    + std::mem::size_of::<Header>()  // `header` size
-    + (
-        std::mem::align_of::<f64>() - (std::mem::size_of::<Header>() % std::mem::align_of::<f64>())
-    ); // padding between `header` and `length`
+/// Offset to start of the different fields of `Num`,
+/// relative to the start of an `Num` struct.
+/// (This works because of #[repr(C)])
+const OFFSET_TO_HEADER: usize = 0;
+const OFFSET_TO_DATA: usize = OFFSET_TO_HEADER + padded_offset::<Header, f64>();
 
 /// data is written directly after `length`
 #[derive(Debug, PartialEq)]
 #[repr(C)]
 pub struct Number {
-    pub (crate) header: Header,
-    pub data: f64,
+    pub(crate) header: Header,
+    data: f64,
 }
 
-
 impl Number {
-
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: f64) -> Result<&'a mut Self, HeapError> where 'heap: 'a {
-        let size: usize = OFFSET_TO_DATA + std::mem::size_of::<f64>();
+    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: f64) -> Result<&'a mut Self, HeapError>
+    where
+        'heap: 'a,
+    {
+        let size: usize = std::mem::size_of::<Self>();
         let ptr = heap.alloc(size)?;
         unsafe {
             // write `header`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header::Number,
-            );
+            std::ptr::write(ptr.add(OFFSET_TO_HEADER) as *mut Header, Header::Number);
             // write `data`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_DATA) as *mut f64,
-                value,
-            );
+            std::ptr::write(ptr.add(OFFSET_TO_DATA) as *mut f64, value);
             let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
             Ok(obj_ref)
         }
     }
+}
 
-    pub fn as_mut_ref<'s>(&'s mut self) -> &'s mut f64 {
+impl Into<f64> for &mut Number {
+    fn into(self) -> f64 {
+        let data_ptr = &self.data as *const _ as *const u8;
         unsafe {
-            let self_ptr: *const u8 = std::mem::transmute::<&'s mut Self, *const u8>(self);
-            let data_ptr = self_ptr.add(OFFSET_TO_DATA);
-            std::mem::transmute::<*const u8, &'s mut f64>(data_ptr)
+            let data_ref = std::mem::transmute::<*const u8, &f64>(data_ptr);
+            *data_ref
+        }
+    }
+}
+impl Into<f64> for &Number {
+    fn into(self) -> f64 {
+        let data_ptr = &self.data as *const _ as *const u8;
+        unsafe {
+            let data_ref = std::mem::transmute::<*const u8, &f64>(data_ptr);
+            *data_ref
+        }
+    }
+}
+
+impl AsMut<f64> for Number {
+    fn as_mut(&mut self) -> &mut f64 {
+        let data_ptr = &self.data as *const _ as *const u8;
+        unsafe {
+            let data_ref = std::mem::transmute::<*const u8, &mut f64>(data_ptr);
+            data_ref
+        }
+    }
+}
+
+impl AsRef<f64> for Number {
+    fn as_ref(&self) -> &f64 {
+        let data_ptr = &self.data as *const _ as *const u8;
+        unsafe {
+            let data_ref = std::mem::transmute::<*const u8, &f64>(data_ptr);
+            data_ref
         }
     }
 }
@@ -53,5 +79,4 @@ impl Drop for Number {
     fn drop(&mut self) {
         std::mem::forget(self);
     }
-
 }

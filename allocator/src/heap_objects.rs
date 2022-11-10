@@ -1,4 +1,3 @@
-
 /// Written in each block, right before the actual Object
 /// TODO: replace by a tagged pointer
 #[derive(Debug, PartialEq)]
@@ -13,4 +12,3 @@ pub enum Header {
     Number,
     Str,
 }
-
