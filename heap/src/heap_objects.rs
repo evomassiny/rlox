@@ -11,4 +11,5 @@ pub enum Header {
     Tombstone(*const u8),
     Number,
     Str,
+    Array(usize),
 }
