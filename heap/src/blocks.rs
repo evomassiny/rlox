@@ -148,7 +148,7 @@ pub struct BumpBlock {
     /// the underlying allocated array
     block: Block,
     /// object that keeps track of which section contains live objects
-    meta: Box<BlockMeta>,
+    meta: BlockMeta,
 }
 
 impl BumpBlock {
@@ -179,7 +179,7 @@ impl BumpBlock {
         Ok(Self {
             cursor: BlockOffset::new(0),
             limit: BlockOffset::new(BLOCK_SIZE),
-            meta: Box::new(BlockMeta::new()),
+            meta: BlockMeta::new(),
             block: Block::new(BLOCK_SIZE)?,
         })
     }

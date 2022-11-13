@@ -93,6 +93,7 @@ impl<T: Read> PeekOffset for ReaderPeeker<T> {
 
 #[test]
 fn test_utf8_reader() {
+    use std::fs::File;
     let path = "./test-data/valid-utf8.txt";
     let file = File::open(path).expect("Failed to read test file.");
     let mut reader = ReaderPeeker::new(file);
