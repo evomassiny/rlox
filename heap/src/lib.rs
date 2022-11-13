@@ -1,23 +1,30 @@
 mod align;
 mod arrays;
 mod blocks;
+mod boxed_values;
 mod heap;
 mod heap_objects;
-mod numbers;
+mod lists;
 mod strings;
+mod values;
 
 use crate::arrays::Array;
+pub use crate::boxed_values::BoxedValue;
 pub use crate::heap::{Heap, HeapError};
-pub use crate::numbers::Number;
+pub use crate::lists::List;
 pub use crate::strings::Str;
+pub use crate::values::Value;
+
+use crate::lists::LIST_START_CAPACITY;
 
 #[test]
-fn test_alloc_number() {
+fn test_alloc_boxed_values() {
     let mut heap = Heap::new();
-    let number: &mut Number = Number::new(&mut heap, 2.0).expect("Number allocation failed");
-    *number.as_mut() = 45.;
-    let value: f64 = *number.as_ref();
-    assert_eq!(value, 45.);
+    let number: &mut BoxedValue =
+        BoxedValue::new(&mut heap, Value::Int(1)).expect("BoxedValue allocation failed");
+    *number.as_mut() = Value::Int(4);
+    let value: Value = *number.as_ref();
+    assert_eq!(value, Value::Int(4));
 }
 
 #[test]
@@ -45,4 +52,48 @@ fn test_alloc_array() {
 
         assert_eq!(array.get(10), None);
     };
+}
+
+#[test]
+fn test_alloc_list() {
+    let mut heap = Heap::new();
+    let list: &mut List = List::new(&mut heap).expect("list allocation failed");
+    assert_eq!(list.len(), 0);
+    list.push(&mut heap, Value::Bool(true));
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0], Value::Bool(true));
+}
+
+#[test]
+fn test_realloc_list() {
+    let mut heap = Heap::new();
+    let list: &mut List = List::new(&mut heap).expect("list allocation failed");
+    // push more element that the original buffer can hold,
+    // to trigger a reallocation
+    for i in 0..(LIST_START_CAPACITY * 2) {
+        list.push(&mut heap, Value::Int(i as i64));
+    }
+    assert_eq!(list.len(), LIST_START_CAPACITY * 2);
+    for i in 0..(LIST_START_CAPACITY * 2) {
+        assert_eq!(list[i], Value::Int(i as i64));
+    }
+}
+
+#[test]
+fn test_item_mutability() {
+    let mut heap = Heap::new();
+    let list: &mut List = List::new(&mut heap).expect("list allocation failed");
+    list.push(&mut heap, Value::Bool(true));
+    assert_eq!(list[0], Value::Bool(true));
+    list[0] = Value::Bool(false);
+    assert_eq!(list[0], Value::Bool(false));
+}
+
+#[test]
+#[should_panic]
+fn test_out_of_bound_access_list() {
+    let mut heap = Heap::new();
+    let list: &mut List = List::new(&mut heap).expect("list allocation failed");
+    list.push(&mut heap, Value::Bool(true));
+    list[2] = Value::Bool(false); // out of bound
 }

@@ -6,7 +6,7 @@ use std::fs::File;
 
 use std::path::Path;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LexerError {
     InvalidToken { span: Span },
 }

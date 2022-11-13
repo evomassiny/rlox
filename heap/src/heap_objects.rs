@@ -9,7 +9,12 @@ pub enum Header {
     /// to a Tombstone, we can update it to point to the new location of
     /// the object.
     Tombstone(*const u8),
-    Number,
+    /// A (stack) value, moved onto the heap
+    BoxedValue,
+    /// An immuatble char array,
     Str,
+    /// A fixed size array
     Array(usize),
+    /// A growable array
+    List,
 }

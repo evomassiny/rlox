@@ -24,10 +24,7 @@ pub struct Str {
 }
 
 impl Str {
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, HeapError>
-    where
-        'heap: 'a,
-    {
+    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, HeapError> {
         let bytes = value.as_bytes();
         let size: usize = OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
         let ptr = heap.alloc(size)?;

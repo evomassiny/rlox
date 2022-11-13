@@ -1,6 +1,6 @@
 use std::io::Read;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct BufferFull;
 
 /// stack allocated buffer,

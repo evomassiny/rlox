@@ -1,6 +1,6 @@
 use super::ring_buffer::RingBuffer;
 use super::source::{PeekOffset, ReadError};
-use std::fs::File;
+
 
 use std::io::prelude::*;
 

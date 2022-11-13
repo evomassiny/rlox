@@ -25,47 +25,49 @@ pub(crate) struct Array<T> {
 }
 
 impl<T: Sized> Array<T> {
-    pub fn new<'heap, 'a>(
-        heap: &'heap mut Heap,
-        array_len: usize,
-    ) -> Result<&'a mut Self, HeapError>
-    where
-        'heap: 'a,
-    {
+    pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, HeapError> {
         let offset_to_buffer: usize = OFFSET_TO_HEADER + padded_offset::<Header, T>();
         let size = offset_to_buffer + array_len * std::mem::size_of::<T>();
         let ptr = heap.alloc(size)?;
-        dbg!(ptr);
         unsafe {
             // write `header`
             std::ptr::write(
                 ptr.add(OFFSET_TO_HEADER) as *mut Header,
                 Header::Array(array_len),
             );
-            let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
+            let obj_ref = std::mem::transmute::<*const u8, &'b mut Self>(ptr);
             Ok(obj_ref)
         }
     }
 
-    fn item_ptr(&self, index: usize) -> Option<*const u8> {
+    /// Pointer to the first element of the data array.
+    pub(crate) fn buffer_ptr(&self) -> *const u8 {
+        &self._buffer as *const _ as *const u8
+    }
+
+    /// number of element this array can hold
+    pub(crate) fn size(&self) -> usize {
         let Header::Array(size) = self.header else {
             panic!("Invalid access, header should be an array.");
         };
-        if index >= size {
+        size
+    }
+
+    fn item_ptr(&self, index: usize) -> Option<*const u8> {
+        if index >= self.size() {
             return None;
         }
-        let buffer_ptr = &self._buffer as *const _ as *const u8;
-        unsafe { Some(buffer_ptr.add(index * std::mem::size_of::<T>())) }
+        unsafe { Some(self.buffer_ptr().add(index * std::mem::size_of::<T>())) }
     }
 
     /// SAFETY: unsafe because the underlying item memory might be uninitialized
-    pub unsafe fn get(&self, index: usize) -> Option<&T> {
+    pub(crate) unsafe fn get(&self, index: usize) -> Option<&T> {
         let item_ptr = self.item_ptr(index)?;
         Some(std::mem::transmute::<*const u8, &T>(item_ptr))
     }
 
     /// SAFETY: unsafe because the underlying item memory might be uninitialized
-    pub unsafe fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+    pub(crate) unsafe fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         let item_ptr = self.item_ptr(index)?;
         Some(std::mem::transmute::<*const u8, &mut T>(item_ptr))
     }
