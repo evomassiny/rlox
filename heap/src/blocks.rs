@@ -147,8 +147,8 @@ pub struct BumpBlock {
     limit: BlockOffset,
     /// the underlying allocated array
     block: Block,
-    /// object that keeps track of which section contains live objects
-    meta: BlockMeta,
+    /// keeps track of which section (called line) contains live objects
+    pub line_mark: [bool; LINE_COUNT],
 }
 
 impl BumpBlock {
@@ -161,7 +161,7 @@ impl BumpBlock {
             if !next_bump.in_block() {
                 return None;
             }
-            match self.meta.find_next_available_hole(self.limit) {
+            match self.find_next_available_hole(self.limit) {
                 Some((cursor, limit)) => {
                     self.cursor = cursor;
                     self.limit = limit;
@@ -179,22 +179,14 @@ impl BumpBlock {
         Ok(Self {
             cursor: BlockOffset::new(0),
             limit: BlockOffset::new(BLOCK_SIZE),
-            meta: BlockMeta::new(),
+            line_mark: [false; LINE_COUNT],
             block: Block::new(BLOCK_SIZE)?,
         })
     }
-}
-
-/// Keeps tracks of marked lines in a block
-pub struct BlockMeta {
-    /// either or not each contains live objects
-    pub line_mark: [bool; LINE_COUNT],
-    /// either or not the whole block contains live objects
-    pub block_mark: bool,
-}
-impl BlockMeta {
+    
     /// starting from the offset `starting_at` locate the next hole,
-    /// return its start and end offset.
+    /// based on the marks of `self.line_mark`
+    /// return its start and end offset
     pub fn find_next_available_hole(
         &self,
         starting_at: BlockOffset,
@@ -234,13 +226,8 @@ impl BlockMeta {
         Some((hole_start, hole_end))
     }
 
-    pub fn new() -> Self {
-        Self {
-            line_mark: [false; LINE_COUNT],
-            block_mark: false,
-        }
-    }
 }
+
 
 #[test]
 fn alloc_and_dealloc_block() {
@@ -254,10 +241,10 @@ fn alloc_and_dealloc_block() {
 
 #[test]
 fn hole_lookup() {
-    let mut meta = BlockMeta::new();
-    meta.line_mark[10] = true; // mark line as "filled"
+    let mut block = BumpBlock::new().unwrap();
+    block.line_mark[10] = true; // mark line as "filled"
     assert_eq!(
-        meta.find_next_available_hole(BlockOffset::new(0)),
+        block.find_next_available_hole(BlockOffset::new(0)),
         Some((
             BlockOffset::from_line_index(0),
             BlockOffset::from_line_index(10)
@@ -265,9 +252,9 @@ fn hole_lookup() {
     );
 
     // assert that a marked line also invalidate the following one.
-    meta.line_mark[15] = true;
+    block.line_mark[15] = true;
     assert_eq!(
-        meta.find_next_available_hole(BlockOffset::from_line_index(10)),
+        block.find_next_available_hole(BlockOffset::from_line_index(10)),
         Some((
             BlockOffset::from_line_index(12),
             BlockOffset::from_line_index(15),
