@@ -1,6 +1,6 @@
 use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
-use crate::heap_objects::Header;
+use crate::heap_objects::{Header, Markable, Object};
 use std::convert::AsRef;
 use std::marker::PhantomData;
 
@@ -30,7 +30,13 @@ impl Str {
         let ptr = heap.alloc(size)?;
         unsafe {
             // write `header`
-            std::ptr::write(ptr.add(OFFSET_TO_HEADER) as *mut Header, Header::Str);
+            std::ptr::write(
+                ptr.add(OFFSET_TO_HEADER) as *mut Header,
+                Header {
+                    kind: Object::Str,
+                    mark: false,
+                },
+            );
             // write `length`
             std::ptr::write(ptr.add(OFFSET_TO_LENGTH) as *mut usize, bytes.len());
             // write byte array
@@ -52,5 +58,17 @@ impl AsRef<str> for Str {
             let slice = std::slice::from_raw_parts(buffer_ptr, self.length);
             std::str::from_utf8_unchecked(slice)
         }
+    }
+}
+
+impl Markable for Str {
+    /// Str do not reference any other data
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const u8>) -> usize {
+        0
+    }
+
+    fn size_in_bytes(&self) -> usize {
+        // OFFSET_TO_BUFFER includes padding
+        return OFFSET_TO_BUFFER + self.length;
     }
 }

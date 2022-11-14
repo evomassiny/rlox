@@ -1,7 +1,7 @@
 /// Written in each block, right before the actual Object
 /// TODO: replace by a tagged pointer
 #[derive(Debug, PartialEq)]
-pub enum Header {
+pub enum Object {
     /// When an Object is evacuated (eg: relocated),
     /// we leave a Tombstone in its place, which points
     /// to the new location of the Object header.
@@ -11,10 +11,24 @@ pub enum Header {
     Tombstone(*const u8),
     /// A (stack) value, moved onto the heap
     BoxedValue,
-    /// An immuatble char array,
+    /// An immutable char array,
     Str,
     /// A fixed size array
     Array(usize),
     /// A growable array
     List,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Header {
+    pub kind: Object,
+    pub mark: bool,
+}
+
+pub trait Markable {
+    /// append pointers to heap objects referenced by `&self,`
+    /// and returns the number of "appended" refs.
+    fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize;
+
+    fn size_in_bytes(&self) -> usize;
 }

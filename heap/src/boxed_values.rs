@@ -1,6 +1,6 @@
 use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
-use crate::heap_objects::Header;
+use crate::heap_objects::{Header, Markable, Object};
 use crate::values::Value;
 use std::convert::{AsMut, AsRef, Into};
 
@@ -24,7 +24,13 @@ impl BoxedValue {
         let ptr = heap.alloc(size)?;
         unsafe {
             // write `header`
-            std::ptr::write(ptr.add(OFFSET_TO_HEADER) as *mut Header, Header::BoxedValue);
+            std::ptr::write(
+                ptr.add(OFFSET_TO_HEADER) as *mut Header,
+                Header {
+                    kind: Object::BoxedValue,
+                    mark: false,
+                },
+            );
             // write `data`
             std::ptr::write(ptr.add(OFFSET_TO_DATA) as *mut Value, value);
             let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
@@ -69,5 +75,18 @@ impl AsRef<Value> for BoxedValue {
             let data_ref = std::mem::transmute::<*const u8, &Value>(data_ptr);
             data_ref
         }
+    }
+}
+
+impl Markable for BoxedValue {
+    /// Arrays might reference other object,
+    /// but indirectly, though a List.
+    /// the `Markable` impl for `List` handle it.
+    fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize {
+        self.data.collect_references(object_ptrs)
+    }
+
+    fn size_in_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
     }
 }

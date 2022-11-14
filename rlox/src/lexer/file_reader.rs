@@ -1,7 +1,6 @@
 use super::ring_buffer::RingBuffer;
 use super::source::{PeekOffset, ReadError};
 
-
 use std::io::prelude::*;
 
 /// try to parse utf-8 by batch of 128 bytes

@@ -1,7 +1,7 @@
 use crate::align::padded_offset;
 use crate::arrays::Array;
 use crate::heap::{Heap, HeapError};
-use crate::heap_objects::Header;
+use crate::heap_objects::{Header, Markable, Object};
 use crate::values::Value;
 use std::ops::{Index, IndexMut};
 
@@ -37,7 +37,13 @@ impl<'buf> List<'buf> {
         let array_mut_ref = Array::<Value>::new(heap, LIST_START_CAPACITY)?;
         unsafe {
             // header
-            std::ptr::write(ptr.add(OFFSET_TO_HEADER) as *mut Header, Header::List);
+            std::ptr::write(
+                ptr.add(OFFSET_TO_HEADER) as *mut Header,
+                Header {
+                    kind: Object::List,
+                    mark: false,
+                },
+            );
             // length
             std::ptr::write(ptr.add(OFFSET_TO_LENGTH) as *mut usize, 0);
             // capacity
@@ -136,5 +142,23 @@ impl IndexMut<usize> for List<'_> {
             // unwrap() is safe because of the bound check
             self.array_ptr.get_mut(index).unwrap()
         }
+    }
+}
+
+impl Markable for List<'_> {
+    /// Append array pointer + its initialize item
+    /// if they contains references
+    fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize {
+        let mut count: usize = 1;
+        object_ptrs.push(self.array_ptr as *const _ as *const u8);
+
+        for i in 0..self.len() {
+            count += self[i].collect_references(object_ptrs);
+        }
+        count
+    }
+
+    fn size_in_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
     }
 }

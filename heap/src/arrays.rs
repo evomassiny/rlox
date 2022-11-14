@@ -1,6 +1,6 @@
 use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
-use crate::heap_objects::Header;
+use crate::heap_objects::{Header, Markable, Object};
 use std::convert::AsRef;
 use std::marker::{PhantomData, Sized};
 
@@ -33,7 +33,10 @@ impl<T: Sized> Array<T> {
             // write `header`
             std::ptr::write(
                 ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header::Array(array_len),
+                Header {
+                    kind: Object::Array(array_len),
+                    mark: false,
+                },
             );
             let obj_ref = std::mem::transmute::<*const u8, &'b mut Self>(ptr);
             Ok(obj_ref)
@@ -47,7 +50,7 @@ impl<T: Sized> Array<T> {
 
     /// number of element this array can hold
     pub(crate) fn size(&self) -> usize {
-        let Header::Array(size) = self.header else {
+        let Header { kind: Object::Array(size), .. } = self.header else {
             panic!("Invalid access, header should be an array.");
         };
         size
@@ -70,5 +73,19 @@ impl<T: Sized> Array<T> {
     pub(crate) unsafe fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         let item_ptr = self.item_ptr(index)?;
         Some(std::mem::transmute::<*const u8, &mut T>(item_ptr))
+    }
+}
+
+impl<T> Markable for Array<T> {
+    /// Arrays might reference other object,
+    /// but indirectly, though a List.
+    /// the `Markable` impl for `List` handle it.
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const u8>) -> usize {
+        0
+    }
+
+    /// return the size of the Header + padding + size of data buffer
+    fn size_in_bytes(&self) -> usize {
+        padded_offset::<Header, T>() + self.size() * std::mem::size_of::<T>()
     }
 }

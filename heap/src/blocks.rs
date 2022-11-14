@@ -183,7 +183,7 @@ impl BumpBlock {
             block: Block::new(BLOCK_SIZE)?,
         })
     }
-    
+
     /// starting from the offset `starting_at` locate the next hole,
     /// based on the marks of `self.line_mark`
     /// return its start and end offset
@@ -225,9 +225,7 @@ impl BumpBlock {
         let hole_end = hole_start + BlockOffset::from_line_index(hole_size);
         Some((hole_start, hole_end))
     }
-
 }
-
 
 #[test]
 fn alloc_and_dealloc_block() {

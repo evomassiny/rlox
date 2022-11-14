@@ -1,4 +1,10 @@
+use crate::arrays::Array;
 use crate::blocks::{BlockError, BumpBlock};
+use crate::boxed_values::BoxedValue;
+use crate::heap_objects::{Header, Markable, Object};
+use crate::lists::List;
+use crate::strings::Str;
+use crate::values::Value;
 
 #[derive(Debug)]
 pub enum HeapError {
@@ -35,5 +41,42 @@ impl Heap {
         };
         self.blocks.push(block);
         Ok(address)
+    }
+
+    /// TODO:
+    /// * evacuate objects
+    /// * locate concerned block and mark it
+    /// * test !
+    pub fn mark_value(&mut self, value: &Value, mark: bool) {
+        let mut object_ptrs: Vec<*const u8> = Vec::new();
+        value.collect_references(&mut object_ptrs);
+
+        let mut previous: Option<*const u8> = None;
+        while let Some(ptr) = object_ptrs.pop() {
+            unsafe {
+                let header: &mut Header = std::mem::transmute::<*const u8, &mut Header>(ptr);
+                if header.mark != mark {
+                    header.mark = mark;
+                    match header.kind {
+                        Object::Tombstone(new_ref) => {
+                            // swap `ptr` with `new_ref` in `previous.unwrap()`
+                            todo!()
+                        }
+                        Object::BoxedValue => {
+                            let boxed_value: &BoxedValue =
+                                std::mem::transmute::<*const u8, &BoxedValue>(ptr);
+                            boxed_value.collect_references(&mut object_ptrs);
+                        }
+                        Object::List => {
+                            let list: &List = std::mem::transmute::<*const u8, &List>(ptr);
+                            list.collect_references(&mut object_ptrs);
+                        }
+                        // none of those object contains strong refs
+                        Object::Array(_) | Object::Str => {}
+                    }
+                    previous = Some(ptr);
+                }
+            }
+        }
     }
 }
