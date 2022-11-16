@@ -1,9 +1,6 @@
 use std::alloc::{alloc, dealloc, Layout};
 use std::ops::Add;
 
-/// Align on 2 words boundaries, for simplicity
-pub const ALIGNMENT: usize = std::mem::align_of::<usize>() * 2;
-
 type BlockPtr = std::ptr::NonNull<u8>;
 type BlockSize = usize;
 
@@ -29,7 +26,7 @@ pub struct Block {
 }
 
 impl Block {
-    /// Allocate a block, aligned on its size.
+    /// Allocate a block, **aligned on its size**
     /// size MUST be a power of two.
     /// (delegate the allocation to the global allocator).
     fn alloc_block(size: BlockSize) -> Result<BlockPtr, BlockError> {
@@ -61,14 +58,38 @@ impl Block {
 
     /// Allocate a new block of size `size`
     pub fn new(size: BlockSize) -> Result<Self, BlockError> {
-        Ok(Self {
+        let mut block = Self {
             ptr: Self::alloc_block(size)?,
             size,
-        })
+        };
+        // intialize block header by zero-ing it
+        for line_mark in block.header_mut().line_mark.iter_mut() {
+            *line_mark = false;
+        }
+        // mark the first line as full,
+        // because it contains the BlockHeader itself.
+        block.header_mut().line_mark[0] = true;
+        Ok(block)
     }
 
     pub fn as_ptr(&self) -> *const u8 {
         self.ptr.as_ptr()
+    }
+
+    /// return ref to the BlockHeader
+    /// (the first LINE_SIZE bytes of the block)
+    pub fn header(&self) -> &BlockHeader {
+        unsafe {
+            std::mem::transmute::<*const u8, &BlockHeader>(self.ptr.as_ptr())
+        }
+    }
+    
+    /// return exclusize ref to the BlockHeader
+    /// (the first LINE_SIZE bytes of the block)
+    pub fn header_mut(&mut self) -> &mut BlockHeader {
+        unsafe {
+            std::mem::transmute::<*const u8, &mut BlockHeader>(self.ptr.as_ptr())
+        }
     }
 }
 impl Drop for Block {
@@ -78,10 +99,13 @@ impl Drop for Block {
     }
 }
 
-/// use 2**15 bytes for each block
-pub const BLOCK_SIZE_BITS: usize = 15;
-/// use 32 kB block
-pub const BLOCK_SIZE: usize = 1 << BLOCK_SIZE_BITS;
+/// use 2**15 bytes for each block (32 kB)
+pub const BLOCK_SIZE: usize = 1 << 15;
+
+// Because blocks are aligned on their size,
+// removing the lower bit of an alloacted object 
+// will return the addr of the header it belongs to.
+pub const MASK_LOWER_BLOCK_BITS: usize = !(BLOCK_SIZE - 1);
 
 /// use 2**7 bytes for each line
 pub const LINE_SIZE_BITS: usize = 7;
@@ -134,56 +158,13 @@ impl Add<usize> for BlockOffset {
     }
 }
 
-/// Bump allocator, allocates into an underliying `Block` of data.
-/// It divides each blocks into "lines", everytime we allocate an object into
-/// the block, we mark which sections (eg. lines) of the block were affected.
-pub struct BumpBlock {
-    /// offset to self.block.as_ptr() that points
-    /// the next object can be written (in the block)
-    /// eg: it point to an "empty" section of data,
-    /// the size of this empty section is decribed by `self.limit`
-    cursor: BlockOffset,
-    /// size of the "empty" section pointed by `self.cursor`
-    limit: BlockOffset,
-    /// the underlying allocated array
-    block: Block,
+/// BlockHeader, first bytes of an HEADER
+#[repr(C)]
+pub struct BlockHeader {
     /// keeps track of which section (called line) contains live objects
     pub line_mark: [bool; LINE_COUNT],
 }
-
-impl BumpBlock {
-    /// returns a pointer to a slice of bytes that can contains an object of `alloc_size`.
-    pub fn inner_alloc(&mut self, alloc_size: usize) -> Option<*const u8> {
-        let mut next_bump = self.cursor + alloc_size;
-        // check is the object would fit in the empty slice pointed by self.cursor
-        // if so, lookup for the next hole
-        while next_bump > self.limit {
-            if !next_bump.in_block() {
-                return None;
-            }
-            match self.find_next_available_hole(self.limit) {
-                Some((cursor, limit)) => {
-                    self.cursor = cursor;
-                    self.limit = limit;
-                    next_bump = cursor + alloc_size;
-                }
-                None => return None,
-            }
-        }
-        let offset = self.cursor;
-        self.cursor = next_bump;
-        Some(offset.as_ptr(&self.block))
-    }
-
-    pub fn new() -> Result<Self, BlockError> {
-        Ok(Self {
-            cursor: BlockOffset::new(0),
-            limit: BlockOffset::new(BLOCK_SIZE),
-            line_mark: [false; LINE_COUNT],
-            block: Block::new(BLOCK_SIZE)?,
-        })
-    }
-
+impl BlockHeader {
     /// starting from the offset `starting_at` locate the next hole,
     /// based on the marks of `self.line_mark`
     /// return its start and end offset
@@ -225,6 +206,80 @@ impl BumpBlock {
         let hole_end = hole_start + BlockOffset::from_line_index(hole_size);
         Some((hole_start, hole_end))
     }
+
+    /// Return the addr of the block header related to the object pointed by `ptr`
+    /// (rely on block alignement for this)
+    /// 
+    /// NOTE:
+    /// the lifetime of the returned value is not actually 'static,
+    /// it is tied to the lifetime of its block.
+    /// But the compiler does not know that.
+    pub unsafe fn from_object_ptr(ptr: *const u8) -> &'static BlockHeader {
+        // Because blocks are aligned on their size,
+        // removing the lower bit of an alloacted object 
+        // will return the addr of the header it belongs to.
+
+        let block_start = (ptr as usize) & MASK_LOWER_BLOCK_BITS;
+        std::mem::transmute::<*const u8, &BlockHeader>(block_start as *const u8)
+
+    }
+}
+
+/// Bump allocator, allocates into an underliying `Block` of data.
+/// It divides each blocks into "lines", everytime we allocate an object into
+/// the block, we mark which sections (eg. lines) of the block were affected.
+pub struct BumpBlock {
+    /// offset to self.block.as_ptr() that points
+    /// the next object can be written (in the block)
+    /// eg: it point to an "empty" section of data,
+    /// the size of this empty section is decribed by `self.limit`
+    cursor: BlockOffset,
+    /// size of the "empty" section pointed by `self.cursor`
+    limit: BlockOffset,
+    /// the underlying allocated array
+    block: Block,
+}
+
+impl BumpBlock {
+    /// returns a pointer to a slice of bytes that can contains an object of `alloc_size`.
+    pub fn inner_alloc(&mut self, alloc_size: usize) -> Option<*const u8> {
+        let mut next_bump = self.cursor + alloc_size;
+        // check is the object would fit in the empty slice pointed by self.cursor
+        // if so, lookup for the next hole
+        while next_bump > self.limit {
+            if !next_bump.in_block() {
+                return None;
+            }
+            match self.find_next_available_hole(self.limit) {
+                Some((cursor, limit)) => {
+                    self.cursor = cursor;
+                    self.limit = limit;
+                    next_bump = cursor + alloc_size;
+                }
+                None => return None,
+            }
+        }
+        let offset = self.cursor;
+        self.cursor = next_bump;
+        Some(offset.as_ptr(&self.block))
+    }
+
+    /// lookup for unmarker lines in the block header
+    pub fn find_next_available_hole(
+        &self,
+        starting_at: BlockOffset,
+    ) -> Option<(BlockOffset, BlockOffset)> {
+        self.block.header().find_next_available_hole(starting_at)
+    }
+
+    pub fn new() -> Result<Self, BlockError> {
+        Ok(Self {
+            cursor: BlockOffset::new(0),
+            limit: BlockOffset::new(BLOCK_SIZE),
+            block: Block::new(BLOCK_SIZE)?,
+        })
+    }
+
 }
 
 #[test]
@@ -240,17 +295,17 @@ fn alloc_and_dealloc_block() {
 #[test]
 fn hole_lookup() {
     let mut block = BumpBlock::new().unwrap();
-    block.line_mark[10] = true; // mark line as "filled"
+    block.block.header_mut().line_mark[10] = true; // mark line as "filled"
     assert_eq!(
         block.find_next_available_hole(BlockOffset::new(0)),
         Some((
-            BlockOffset::from_line_index(0),
+            BlockOffset::from_line_index(2),
             BlockOffset::from_line_index(10)
         )),
     );
 
     // assert that a marked line also invalidate the following one.
-    block.line_mark[15] = true;
+    block.block.header_mut().line_mark[15] = true;
     assert_eq!(
         block.find_next_available_hole(BlockOffset::from_line_index(10)),
         Some((
