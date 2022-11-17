@@ -1,21 +1,13 @@
-use crate::align::padded_offset;
 use crate::arrays::Array;
 use crate::heap::{Heap, HeapError};
 use crate::heap_objects::{Header, Markable, Object};
 use crate::values::Value;
 use std::ops::{Index, IndexMut};
+use std::ptr::addr_of;
 
 /// When the List is instanciated, its
 /// base capacity is of `LIST_START_CAPACITY`.
 pub(crate) const LIST_START_CAPACITY: usize = 8;
-
-/// Offset to start of the different fields of a `List`,
-/// relative to the start of an `Array` struct.
-/// (This works because of #[repr(C)])
-const OFFSET_TO_HEADER: usize = 0;
-const OFFSET_TO_LENGTH: usize = OFFSET_TO_HEADER + padded_offset::<Header, usize>();
-const OFFSET_TO_CAPACITY: usize = OFFSET_TO_LENGTH + padded_offset::<usize, usize>();
-const OFFSET_TO_ARRAY_PTR: usize = OFFSET_TO_CAPACITY + padded_offset::<usize, *const u8>();
 
 /// growable array of `Value`s
 #[derive(Debug, PartialEq)]
@@ -36,29 +28,16 @@ impl<'buf> List<'buf> {
         let ptr = heap.alloc(obj_size)?;
         let array_mut_ref = Array::<Value>::new(heap, LIST_START_CAPACITY)?;
         unsafe {
-            // header
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header {
-                    kind: Object::List,
-                    mark: false,
-                },
-            );
-            // length
-            std::ptr::write(ptr.add(OFFSET_TO_LENGTH) as *mut usize, 0);
-            // capacity
-            std::ptr::write(
-                ptr.add(OFFSET_TO_CAPACITY) as *mut usize,
-                LIST_START_CAPACITY,
-            );
-            // array_ptr
-            std::ptr::write(
-                ptr.add(OFFSET_TO_ARRAY_PTR) as *mut &mut Array<Value>,
-                array_mut_ref,
-            );
+            let mut list = ptr.as_ptr().cast::<Self>();
+            (*list).header = Header {
+                kind: Object::List,
+                mark: false,
+            };
+            (*list).length = 0;
+            (*list).capacity = LIST_START_CAPACITY;
+            (*list).array_ptr = array_mut_ref;
 
-            let obj_ref = std::mem::transmute::<*const u8, &'buf mut Self>(ptr);
-            Ok(obj_ref)
+            Ok(&mut *list)
         }
     }
 
@@ -149,13 +128,13 @@ impl Markable for List<'_> {
     /// Append array pointer + its initialize item
     /// if they contains references
     fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize {
-        let mut count: usize = 1;
         object_ptrs.push(self.array_ptr as *const _ as *const u8);
-
         for i in 0..self.len() {
-            count += self[i].collect_references(object_ptrs);
+            // unwrap() is safe because i belonf to [0, self.len()]
+            let item_ref = unsafe { self.array_ptr.get(i).unwrap() };
+            object_ptrs.push(item_ref as *const _ as *const u8);
         }
-        count
+        self.len() + 1
     }
 
     fn size_in_bytes(&self) -> usize {

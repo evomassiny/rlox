@@ -1,5 +1,5 @@
 use crate::arrays::Array;
-use crate::blocks::{BlockError, BumpBlock};
+use crate::blocks::{Block, BlockError, BlockHeader, InBlockPtr};
 use crate::boxed_values::BoxedValue;
 use crate::heap_objects::{Header, Markable, Object};
 use crate::lists::List;
@@ -14,7 +14,7 @@ pub enum HeapError {
 
 /// GC-ed Heap
 pub struct Heap {
-    blocks: Vec<BumpBlock>,
+    blocks: Vec<Block>,
 }
 
 impl Heap {
@@ -22,25 +22,36 @@ impl Heap {
         Self { blocks: Vec::new() }
     }
 
-    pub fn alloc(&mut self, alloc_size: usize) -> Result<*const u8, HeapError> {
+    pub fn alloc(&mut self, alloc_size: usize) -> Result<InBlockPtr, HeapError> {
         // linearly search for an empty slot big enough for `alloc_size`
         for block in self.blocks.iter_mut() {
-            if let Some(address) = block.inner_alloc(alloc_size) {
+            if let Some(address) = block.claim_slot(alloc_size) {
                 return Ok(address);
             }
         }
         // if None was found, claim a new block of memory
-        let mut block = match BumpBlock::new() {
+        let mut block = match Block::allocate() {
             Ok(block) => block,
             Err(_) => return Err(HeapError::OOM),
         };
         // and allocate into it
-        let address = match block.inner_alloc(alloc_size) {
+        let address = match block.claim_slot(alloc_size) {
             Some(address) => address,
             None => return Err(HeapError::TooBig),
         };
         self.blocks.push(block);
         Ok(address)
+    }
+
+    pub fn start_gc(&mut self) {
+        for block in self.blocks.iter_mut() {
+            block.reset_marks();
+        }
+    }
+    pub fn end_gc(&mut self) {
+        for block in self.blocks.iter_mut() {
+            block.recompute_limits();
+        }
     }
 
     /// TODO:
@@ -54,26 +65,40 @@ impl Heap {
         let mut previous: Option<*const u8> = None;
         while let Some(ptr) = object_ptrs.pop() {
             unsafe {
-                let header: &mut Header = std::mem::transmute::<*const u8, &mut Header>(ptr);
-                if header.mark != mark {
-                    header.mark = mark;
-                    match header.kind {
-                        Object::Tombstone(new_ref) => {
-                            // swap `ptr` with `new_ref` in `previous.unwrap()`
-                            todo!()
-                        }
-                        Object::BoxedValue => {
-                            let boxed_value: &BoxedValue =
-                                std::mem::transmute::<*const u8, &BoxedValue>(ptr);
-                            boxed_value.collect_references(&mut object_ptrs);
-                        }
-                        Object::List => {
-                            let list: &List = std::mem::transmute::<*const u8, &List>(ptr);
-                            list.collect_references(&mut object_ptrs);
-                        }
-                        // none of those object contains strong refs
-                        Object::Array(_) | Object::Str => {}
-                    }
+                let obj_header: *mut Header = ptr.cast::<Header>().cast_mut();
+                if (*obj_header).mark != mark {
+                    // mark Object, so we don't crawl it any
+                    (*obj_header).mark = mark;
+                    // get the block header so we can mark the lines containing the object
+                    // mark line, so we don't reclaim its memory for another object
+                    let block_header: &mut BlockHeader = BlockHeader::from_object_ptr(ptr);
+
+                    dbg!(ptr);
+                    dbg!(&(*obj_header).kind);
+                    //match (*obj_header).kind {
+                    //Object::BoxedValue => {
+                    //let boxed_value = ptr.cast::<BoxedValue>();
+                    //(*boxed_value).collect_references(&mut object_ptrs);
+                    //// mark
+                    //block_header.mark_lines(ptr, (*boxed_value).size_in_bytes())
+                    //}
+                    //Object::List => {
+                    //let list = ptr.cast::<List>();
+                    //(*list).collect_references(&mut object_ptrs);
+                    //block_header.mark_lines(ptr, (*list).size_in_bytes())
+                    //}
+                    //Object::Array(size) => {
+                    //block_header.mark_lines(ptr, size)
+                    //}
+                    //Object::Str => {
+                    //let string = ptr.cast::<Str>();
+                    //block_header.mark_lines(ptr, (*string).size_in_bytes())
+                    //}
+                    //Object::Tombstone(_new_ref) => {
+                    //// swap `ptr` with `new_ref` in `previous.unwrap()`
+                    //todo!()
+                    //}
+                    //}
                     previous = Some(ptr);
                 }
             }

@@ -97,3 +97,21 @@ fn test_out_of_bound_access_list() {
     list.push(&mut heap, Value::Bool(true));
     list[2] = Value::Bool(false); // out of bound
 }
+
+#[test]
+fn test_marking() {
+    use std::ptr::addr_of;
+    let mut heap = Heap::new();
+    let str_a: &mut Str = Str::new(&mut heap, "aaaa").expect("Str allocation failed");
+    let str_b: &mut Str = Str::new(&mut heap, "dddd").expect("Str allocation failed");
+    drop(str_b);
+    let str_c: &mut Str = Str::new(&mut heap, "cccc").expect("Str allocation failed");
+
+    let list: &mut List = List::new(&mut heap).expect("list allocation failed");
+    list.push(&mut heap, Value::Str(str_a as *const _ as *const u8));
+    list.push(&mut heap, Value::Str(str_a as *const _ as *const u8));
+
+    heap.start_gc();
+    heap.mark_value(&Value::List(list as *const _ as *const u8), true);
+    heap.end_gc();
+}

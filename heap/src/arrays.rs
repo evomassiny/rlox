@@ -3,11 +3,7 @@ use crate::heap::{Heap, HeapError};
 use crate::heap_objects::{Header, Markable, Object};
 use std::convert::AsRef;
 use std::marker::{PhantomData, Sized};
-
-/// Offset to start of the different fields of `Array`,
-/// relative to the start of an `Array` struct.
-/// (This works because of #[repr(C)])
-const OFFSET_TO_HEADER: usize = 0;
+use std::ptr::addr_of;
 
 /// This struct defines a Heap managed fixed size array.
 /// It is not mean to be expose to the user,
@@ -26,26 +22,22 @@ pub(crate) struct Array<T> {
 
 impl<T: Sized> Array<T> {
     pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, HeapError> {
-        let offset_to_buffer: usize = OFFSET_TO_HEADER + padded_offset::<Header, T>();
+        let offset_to_buffer: usize = padded_offset::<Header, T>();
         let size = offset_to_buffer + array_len * std::mem::size_of::<T>();
         let ptr = heap.alloc(size)?;
         unsafe {
-            // write `header`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header {
-                    kind: Object::Array(array_len),
-                    mark: false,
-                },
-            );
-            let obj_ref = std::mem::transmute::<*const u8, &'b mut Self>(ptr);
-            Ok(obj_ref)
+            let array = ptr.as_ptr().cast::<Self>();
+            (*array).header = Header {
+                kind: Object::Array(array_len),
+                mark: false,
+            };
+            Ok(&mut *array)
         }
     }
 
     /// Pointer to the first element of the data array.
     pub(crate) fn buffer_ptr(&self) -> *const u8 {
-        &self._buffer as *const _ as *const u8
+        addr_of!(self._buffer).cast::<u8>()
     }
 
     /// number of element this array can hold

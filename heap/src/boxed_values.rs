@@ -1,21 +1,15 @@
-use crate::align::padded_offset;
 use crate::heap::{Heap, HeapError};
 use crate::heap_objects::{Header, Markable, Object};
 use crate::values::Value;
 use std::convert::{AsMut, AsRef, Into};
-
-/// Offset to start of the different fields of `BoxedValue`,
-/// relative to the start of an `BoxedValue` struct.
-/// (This works because of #[repr(C)])
-const OFFSET_TO_HEADER: usize = 0;
-const OFFSET_TO_DATA: usize = OFFSET_TO_HEADER + padded_offset::<Header, Value>();
+use std::ptr::addr_of;
 
 /// A `Value` allocated in the runtime heap.
 #[derive(Debug, PartialEq)]
 #[repr(C)]
 pub struct BoxedValue {
     pub(crate) header: Header,
-    data: Value,
+    value: Value,
 }
 
 impl BoxedValue {
@@ -23,58 +17,37 @@ impl BoxedValue {
         let size: usize = std::mem::size_of::<Self>();
         let ptr = heap.alloc(size)?;
         unsafe {
-            // write `header`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header {
-                    kind: Object::BoxedValue,
-                    mark: false,
-                },
-            );
-            // write `data`
-            std::ptr::write(ptr.add(OFFSET_TO_DATA) as *mut Value, value);
-            let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
-            Ok(obj_ref)
+            let mut boxed_value = ptr.as_ptr().cast::<Self>();
+            (*boxed_value).header = Header {
+                kind: Object::BoxedValue,
+                mark: false,
+            };
+            (*boxed_value).value = value;
+            Ok(&mut *boxed_value)
         }
     }
 }
 
 impl Into<Value> for &mut BoxedValue {
     fn into(self) -> Value {
-        let data_ptr = &self.data as *const _ as *const u8;
-        unsafe {
-            let data_ref = std::mem::transmute::<*const u8, &Value>(data_ptr);
-            *data_ref
-        }
+        self.value
     }
 }
 impl Into<Value> for &BoxedValue {
     fn into(self) -> Value {
-        let data_ptr = &self.data as *const _ as *const u8;
-        unsafe {
-            let data_ref = std::mem::transmute::<*const u8, &Value>(data_ptr);
-            *data_ref
-        }
+        self.value
     }
 }
 
 impl AsMut<Value> for BoxedValue {
     fn as_mut(&mut self) -> &mut Value {
-        let data_ptr = &self.data as *const _ as *const u8;
-        unsafe {
-            let data_ref = std::mem::transmute::<*const u8, &mut Value>(data_ptr);
-            data_ref
-        }
+        &mut self.value
     }
 }
 
 impl AsRef<Value> for BoxedValue {
     fn as_ref(&self) -> &Value {
-        let data_ptr = &self.data as *const _ as *const u8;
-        unsafe {
-            let data_ref = std::mem::transmute::<*const u8, &Value>(data_ptr);
-            data_ref
-        }
+        &self.value
     }
 }
 
@@ -83,7 +56,7 @@ impl Markable for BoxedValue {
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handle it.
     fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize {
-        self.data.collect_references(object_ptrs)
+        self.value.collect_references(object_ptrs)
     }
 
     fn size_in_bytes(&self) -> usize {

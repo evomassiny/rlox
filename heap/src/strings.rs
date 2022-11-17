@@ -3,6 +3,7 @@ use crate::heap::{Heap, HeapError};
 use crate::heap_objects::{Header, Markable, Object};
 use std::convert::AsRef;
 use std::marker::PhantomData;
+use std::ptr::{addr_of, addr_of_mut};
 
 /// Offset to start of the different fields of `Str`,
 /// relative to the start of an `Str` struct.
@@ -29,31 +30,26 @@ impl Str {
         let size: usize = OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
         let ptr = heap.alloc(size)?;
         unsafe {
-            // write `header`
-            std::ptr::write(
-                ptr.add(OFFSET_TO_HEADER) as *mut Header,
-                Header {
-                    kind: Object::Str,
-                    mark: false,
-                },
-            );
-            // write `length`
-            std::ptr::write(ptr.add(OFFSET_TO_LENGTH) as *mut usize, bytes.len());
+            let mut string = ptr.as_ptr().cast::<Self>();
+            (*string).header = Header {
+                kind: Object::Str,
+                mark: false,
+            };
+            (*string).length = bytes.len();
             // write byte array
             std::ptr::copy_nonoverlapping(
                 bytes.as_ptr(),
-                ptr.add(OFFSET_TO_BUFFER) as *mut u8,
+                addr_of_mut!((*string)._buffer).cast::<u8>(),
                 bytes.len(),
             );
-            let obj_ref = std::mem::transmute::<*const u8, &'a mut Self>(ptr);
-            Ok(obj_ref)
+            Ok(&mut *string)
         }
     }
 }
 
 impl AsRef<str> for Str {
     fn as_ref(&self) -> &str {
-        let buffer_ptr = &self._buffer as *const _ as *const u8;
+        let buffer_ptr = addr_of!(self._buffer).cast::<u8>();
         unsafe {
             let slice = std::slice::from_raw_parts(buffer_ptr, self.length);
             std::str::from_utf8_unchecked(slice)
