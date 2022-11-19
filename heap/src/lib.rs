@@ -39,18 +39,17 @@ fn test_alloc_array() {
     let mut heap = Heap::new();
     let array: &mut Array<usize> = Array::new(&mut heap, 10).expect("array allocation failed");
     unsafe {
-        *array.get_mut(0).unwrap() = 45;
-        assert_eq!(*array.get(0).unwrap(), 45);
+        *array.get_mut(0) = 45;
+        assert_eq!(*array.get(0), 45);
 
-        *array.get_mut(1).unwrap() = 666;
-        assert_eq!(*array.get(1).unwrap(), 666);
-        assert_eq!(*array.get(0).unwrap(), 45);
+        *array.get_mut(1) = 666;
+        assert_eq!(*array.get(1), 666);
+        assert_eq!(*array.get(0), 45);
 
-        *array.get_mut(0).unwrap() = 555;
-        assert_eq!(*array.get(0).unwrap(), 555);
-        assert_eq!(*array.get(1).unwrap(), 666);
+        *array.get_mut(0) = 555;
+        assert_eq!(*array.get(0), 555);
+        assert_eq!(*array.get(1), 666);
 
-        assert_eq!(array.get(10), None);
     };
 }
 

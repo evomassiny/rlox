@@ -14,7 +14,7 @@ pub enum Object {
     /// An immutable char array,
     Str,
     /// A fixed size array
-    Array(usize),
+    Array,
     /// A growable array
     List,
 }
@@ -28,7 +28,12 @@ pub struct Header {
 pub trait Markable {
     /// append pointers to heap objects referenced by `&self,`
     /// and returns the number of "appended" refs.
-    fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize;
+    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) -> usize;
 
+    /// returns the size of the object + its header
     fn size_in_bytes(&self) -> usize;
+
+    // Replace a given reference by a new one.
+    // (Usefull when "evacutation" occurs)
+    //fn replace_reference(&mut self, old_ref: *const u8, new_ref: *const u8);
 }

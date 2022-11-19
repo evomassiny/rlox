@@ -59,7 +59,7 @@ impl AsRef<str> for Str {
 
 impl Markable for Str {
     /// Str do not reference any other data
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const u8>) -> usize {
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) -> usize {
         0
     }
 

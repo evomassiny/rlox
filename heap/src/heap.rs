@@ -75,30 +75,33 @@ impl Heap {
 
                     dbg!(ptr);
                     dbg!(&(*obj_header).kind);
-                    //match (*obj_header).kind {
-                    //Object::BoxedValue => {
-                    //let boxed_value = ptr.cast::<BoxedValue>();
-                    //(*boxed_value).collect_references(&mut object_ptrs);
-                    //// mark
-                    //block_header.mark_lines(ptr, (*boxed_value).size_in_bytes())
-                    //}
-                    //Object::List => {
-                    //let list = ptr.cast::<List>();
-                    //(*list).collect_references(&mut object_ptrs);
-                    //block_header.mark_lines(ptr, (*list).size_in_bytes())
-                    //}
-                    //Object::Array(size) => {
-                    //block_header.mark_lines(ptr, size)
-                    //}
-                    //Object::Str => {
-                    //let string = ptr.cast::<Str>();
-                    //block_header.mark_lines(ptr, (*string).size_in_bytes())
-                    //}
-                    //Object::Tombstone(_new_ref) => {
-                    //// swap `ptr` with `new_ref` in `previous.unwrap()`
-                    //todo!()
-                    //}
-                    //}
+                    match (*obj_header).kind {
+                        Object::BoxedValue => {
+                            let boxed_value = ptr.cast::<BoxedValue>();
+                            (*boxed_value).collect_references(&mut object_ptrs);
+                            // mark
+                            block_header.mark_lines(ptr, (*boxed_value).size_in_bytes());
+                        }
+                        Object::List => {
+                            let list = ptr.cast::<List>();
+                            (*list).collect_references(&mut object_ptrs);
+                            block_header.mark_lines(ptr, (*list).size_in_bytes());
+                        }
+                        Object::Array => {
+                            // here we don't know the type of Array item,
+                            // but we don't access them, so we don't care.
+                            let array = ptr.cast::<Array<()>>();
+                            block_header.mark_lines(ptr, (*array).size_in_bytes());
+                        }
+                        Object::Str => {
+                            let string = ptr.cast::<Str>();
+                            block_header.mark_lines(ptr, (*string).size_in_bytes());
+                        }
+                        Object::Tombstone(_new_ref) => {
+                            // swap `ptr` with `new_ref` in `previous.unwrap()`
+                            todo!()
+                        }
+                    }
                     previous = Some(ptr);
                 }
             }
