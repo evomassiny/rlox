@@ -1,6 +1,6 @@
 /// Written in each block, right before the actual Object
 /// TODO: replace by a tagged pointer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Object {
     /// When an Object is evacuated (eg: relocated),
     /// we leave a Tombstone in its place, which points
@@ -28,7 +28,7 @@ pub struct Header {
 pub trait Markable {
     /// append pointers to heap objects referenced by `&self,`
     /// and returns the number of "appended" refs.
-    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) -> usize;
+    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>);
 
     /// returns the size of the object + its header
     fn size_in_bytes(&self) -> usize;

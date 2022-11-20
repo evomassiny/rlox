@@ -80,9 +80,8 @@ impl <T> Markable for Array<T> {
     /// Arrays might reference other object,
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handles it.
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const u8>) -> usize {
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>)  {
         // managed by the object that own the array
-        0
     }
 
     /// return the size of the Header + padding + size of data buffer

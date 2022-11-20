@@ -14,19 +14,27 @@ pub enum Value {
 }
 
 impl Value {
-    pub(crate) fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) -> usize {
-        match self {
+    pub(crate) fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
+        match *self {
             // base value
-            Value::Nil | Value::Float(_) | Value::Int(_) | Value::Bool(_) => 0,
+            Value::Nil | Value::Float(_) | Value::Int(_) | Value::Bool(_) => {},
             // append List pointer
             Value::List(ptr) => {
-                object_ptrs.push(addr_of!((*ptr).header));
-                1
+                // SAFETY:
+                // This is safe because we assert that the value pointer live as long as 
+                // this value
+                
+                unsafe { dbg!(&*ptr); }; // HERE (*ptr).header has already been zeroed
+                object_ptrs.push(ptr.cast::<Header>());
+                unsafe { dbg!(&*ptr); };
             }
             // append Str pointer
             Value::Str(ptr) => {
-                object_ptrs.push(addr_of!((*ptr).header));
-                1
+                // SAFETY:
+                // This is safe because we assert that the value pointer live as long as 
+                // this value
+                let str_header_ptr = unsafe { addr_of!((*ptr).header) }; 
+                object_ptrs.push(str_header_ptr);
             }
         }
     }

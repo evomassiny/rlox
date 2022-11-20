@@ -1,4 +1,5 @@
 use std::alloc::{alloc, dealloc, Layout};
+use crate::heap_objects::{Header};
 use std::ops::Add;
 use std::ptr::NonNull;
 
@@ -25,8 +26,8 @@ pub const MASK_LOWER_BLOCK_BITS: usize = !(BLOCK_SIZE - 1);
 /// (*object) & MASK_UPPER_BLOCK_BITS => offset from object start
 pub const MASK_UPPER_BLOCK_BITS: usize = BLOCK_SIZE - 1;
 
-/// use 2**7 bytes for each line
-pub const LINE_SIZE_BITS: usize = 7;
+/// use 2**8 bytes for each line
+pub const LINE_SIZE_BITS: usize = 8;
 /// use lines of 128 bytes
 pub const LINE_SIZE: usize = 1 << LINE_SIZE_BITS;
 /// number of line per block, 256.
@@ -142,6 +143,7 @@ impl Block {
     /// object, without actually touching the objects.
     pub fn reset_marks(&mut self) {
         self.header_mut().reset_marks();
+        dbg!(std::mem::size_of::<BlockHeader>());
     }
 
     /// find the first hole in the block
@@ -218,6 +220,7 @@ impl Add<usize> for BlockOffset {
 /// one per line.
 /// If a line is "marked", it means that it contains
 /// a live objects
+#[derive(Debug)]
 #[repr(C)]
 pub struct BlockHeader {
     /// keeps track of which section (called line) contains live objects
@@ -273,7 +276,7 @@ impl BlockHeader {
     /// the lifetime of the returned value is not actually 'static,
     /// it is tied to the lifetime of its block.
     /// But the compiler does not know that.
-    pub unsafe fn from_object_ptr(ptr: *const u8) -> &'static mut BlockHeader {
+    pub unsafe fn from_object_ptr(ptr: *const Header) -> &'static mut BlockHeader {
         // Because blocks are aligned on their size,
         // removing the lower bit of an alloacted object
         // will return the addr of the header it belongs to.
@@ -283,7 +286,7 @@ impl BlockHeader {
         &mut *block_header_ptr
     }
 
-    pub fn mark_lines(&mut self, object_ptr: *const u8, object_size: usize) {
+    pub fn mark_lines(&mut self, object_ptr: *const Header, object_size: usize) {
         // because block are aligned, lower bits are equivalent to  byte offset.
         let byte_offset = (object_ptr as usize) & MASK_UPPER_BLOCK_BITS;
         // get line indices
@@ -306,6 +309,12 @@ impl BlockHeader {
             *mark = false;
         }
     }
+}
+
+#[test]
+fn block_header_size() {
+    /// Assert that the Header fits in ONE line.
+    assert!(std::mem::size_of::<BlockHeader>() <= LINE_SIZE);
 }
 
 #[test]

@@ -55,8 +55,8 @@ impl Markable for BoxedValue {
     /// Arrays might reference other object,
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handle it.
-    fn collect_references(&self, object_ptrs: &mut Vec<*const u8>) -> usize {
-        self.value.collect_references(object_ptrs)
+    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
+        self.value.collect_references(object_ptrs);
     }
 
     fn size_in_bytes(&self) -> usize {

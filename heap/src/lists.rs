@@ -12,18 +12,18 @@ pub(crate) const LIST_START_CAPACITY: usize = 8;
 /// growable array of `Value`s
 #[derive(Debug, PartialEq)]
 #[repr(C)]
-pub struct List<'buf> {
+pub struct List {
     pub(crate) header: Header,
     /// actual amount of initialized items held
     length: usize,
     /// max amount of items *`buffer_ptr`, can hold
     capacity: usize,
     /// Exclusive ref to underlying storage
-    array_ptr: &'buf mut Array<Value>,
+    array_ptr: * mut Array<Value>,
 }
 
-impl<'buf> List<'buf> {
-    pub fn new<'a>(heap: &'a mut Heap) -> Result<&'buf mut Self, HeapError> {
+impl List {
+    pub fn new<'a, 'b>(heap: &'a mut Heap) -> Result<&'b mut Self, HeapError> {
         let obj_size = std::mem::size_of::<Self>();
         let ptr = heap.alloc(obj_size)?;
         let array_mut_ref = Array::<Value>::new(heap, LIST_START_CAPACITY)?;
@@ -35,7 +35,7 @@ impl<'buf> List<'buf> {
             };
             (*list).length = 0;
             (*list).capacity = LIST_START_CAPACITY;
-            (*list).array_ptr = array_mut_ref;
+            (*list).array_ptr = array_mut_ref as *mut Array<Value>;
 
             Ok(&mut *list)
         }
@@ -49,12 +49,12 @@ impl<'buf> List<'buf> {
         unsafe {
             // write byte array
             std::ptr::copy_nonoverlapping(
-                self.array_ptr.buffer_ptr() as *mut u8,
+                (*self.array_ptr).buffer_ptr() as *mut u8,
                 array_mut_ref.buffer_ptr() as *mut u8,
                 self.capacity * std::mem::size_of::<Value>(),
             );
         }
-        self.array_ptr = array_mut_ref;
+        self.array_ptr = array_mut_ref as *mut Array<Value>;
         self.capacity = new_capacity;
         Ok(())
     }
@@ -72,7 +72,7 @@ impl<'buf> List<'buf> {
         }
         // expect() is safe because of above check.
         unsafe {
-            let item: &mut Value = self.array_ptr.get_mut(length);
+            let item: &mut Value = (*self.array_ptr).get_mut(length);
             *item = value;
         }
         self.length += 1;
@@ -87,13 +87,13 @@ impl<'buf> List<'buf> {
         self.length -= 1;
         // expect() is safe because of above check.
         unsafe {
-            let item: Value = *self.array_ptr.get_mut(self.length);
+            let item: Value = *(*self.array_ptr).get_mut(self.length);
             Some(item)
         }
     }
 }
 
-impl Index<usize> for List<'_> {
+impl Index<usize> for List {
     type Output = Value;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -102,34 +102,32 @@ impl Index<usize> for List<'_> {
         }
         unsafe {
             // safe because of the bound check
-            self.array_ptr.get(index)
+            (*self.array_ptr).get(index)
         }
     }
 }
 
-impl IndexMut<usize> for List<'_> {
+impl IndexMut<usize> for List {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if index >= self.length {
             panic!("out of bound access");
         }
         unsafe {
             // safe because of the bound check
-            self.array_ptr.get_mut(index)
+            (*self.array_ptr).get_mut(index)
         }
     }
 }
 
-impl Markable for List<'_> {
+impl Markable for List {
     /// Append array pointer + its initialize item
     /// if they contains references
-    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) -> usize {
-        object_ptrs.push(addr_of!((*self.array_ptr).header));
+    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
+        let array_header_ptr = unsafe { addr_of!((*self.array_ptr).header) };
+        object_ptrs.push(array_header_ptr);
         for i in 0..self.len() {
-            // this is safe because i belong to [0, self.len()]
-            let item_ref = unsafe { self.array_ptr.get(i) };
-            object_ptrs.push(addr_of!(item_ref.header));
+            self[i].collect_references(object_ptrs);
         }
-        self.len() + 1
     }
 
     fn size_in_bytes(&self) -> usize {

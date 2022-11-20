@@ -107,10 +107,13 @@ fn test_marking() {
     let str_c: &mut Str = Str::new(&mut heap, "cccc").expect("Str allocation failed");
 
     let list: &mut List = List::new(&mut heap).expect("list allocation failed");
-    list.push(&mut heap, Value::Str(str_a as *const _ as *const u8));
-    list.push(&mut heap, Value::Str(str_a as *const _ as *const u8));
+    list.push(&mut heap, Value::Str(str_a as *const Str));
+    list.push(&mut heap, Value::Str(str_a as *const Str));
+    let list_value = Value::List(addr_of!(*list) as *const List);
 
     heap.start_gc();
-    heap.mark_value(&Value::List(list as *const _ as *const u8), true);
+    heap.mark_value(&list_value, true);
     heap.end_gc();
+
+    assert_eq!(list.len(), 2);
 }
