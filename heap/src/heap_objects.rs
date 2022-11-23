@@ -8,7 +8,7 @@ pub enum Object {
     /// This way, while marking live objects, if some reference points
     /// to a Tombstone, we can update it to point to the new location of
     /// the object.
-    Tombstone(*const u8),
+    Tombstone,
     /// A (stack) value, moved onto the heap
     BoxedValue,
     /// An immutable char array,
@@ -33,7 +33,7 @@ pub trait Markable {
     /// returns the size of the object + its header
     fn size_in_bytes(&self) -> usize;
 
-    // Replace a given reference by a new one.
-    // (Usefull when "evacutation" occurs)
-    //fn replace_reference(&mut self, old_ref: *const u8, new_ref: *const u8);
+    /// Replace a given reference by a new one.
+    /// (Usefull when "evacutation" occurs)
+    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header);
 }

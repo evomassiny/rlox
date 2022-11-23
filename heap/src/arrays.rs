@@ -23,7 +23,7 @@ pub(crate) struct Array<T> {
     /// the length of the Array is stored in the Header.
     pub(crate) header: Header,
     /// buffer size + header + full_size
-    pub (crate) full_size: usize,
+    pub(crate) full_size: usize,
     /// the data itself is stored right after the header
     /// This field marks this struct as ?Sized
     _buffer: PhantomData<[T]>,
@@ -31,9 +31,8 @@ pub(crate) struct Array<T> {
 
 impl<T: Sized> Array<T> {
     pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, HeapError> {
-        let offset_to_buffer: usize = 
-            padded_offset::<Header, usize>()    // header size + padding to `full_size`
-            + padded_offset::<usize, T>();      // `full_size` size + padding to buffer
+        let offset_to_buffer: usize = padded_offset::<Header, usize>()    // header size + padding to `full_size`
+            + padded_offset::<usize, T>(); // `full_size` size + padding to buffer
         let size = offset_to_buffer + array_len * std::mem::size_of::<T>();
         let ptr = heap.alloc(size)?;
         unsafe {
@@ -56,7 +55,7 @@ impl<T: Sized> Array<T> {
     /// SAFETY:
     /// No bound checking at all !
     unsafe fn item_ptr(&self, index: usize) -> *const u8 {
-         self.buffer_ptr().add(index * std::mem::size_of::<T>())
+        self.buffer_ptr().add(index * std::mem::size_of::<T>())
     }
 
     /// SAFETY: unsafe because:
@@ -76,11 +75,11 @@ impl<T: Sized> Array<T> {
     }
 }
 
-impl <T> Markable for Array<T> {
+impl<T> Markable for Array<T> {
     /// Arrays might reference other object,
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handles it.
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>)  {
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) {
         // managed by the object that own the array
     }
 
@@ -89,8 +88,6 @@ impl <T> Markable for Array<T> {
         self.full_size
     }
 
-    //fn replace_reference(&mut self, _old: *const u8, _new: *const u8) {
-        //// managed by the object that own the array
-        //return;
-    //}
+    /// NO-OP because arrays only contains weak refs
+    fn replace_reference(&mut self, _old_ref: *const Header, _new_ref: *const Header) {}
 }

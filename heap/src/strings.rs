@@ -58,12 +58,14 @@ impl AsRef<str> for Str {
 }
 
 impl Markable for Str {
-    /// Str do not reference any other data
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) {
-    }
+    /// Str does not reference any other data, so this is a NO-OP
+    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) {}
 
     fn size_in_bytes(&self) -> usize {
         // OFFSET_TO_BUFFER includes padding
         return OFFSET_TO_BUFFER + self.length;
     }
+
+    /// Str does not reference any other data, so this is a NO-OP
+    fn replace_reference(&mut self, _old_ref: *const Header, _new_ref: *const Header) {}
 }

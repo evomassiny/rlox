@@ -19,7 +19,7 @@ pub struct List {
     /// max amount of items *`buffer_ptr`, can hold
     capacity: usize,
     /// Exclusive ref to underlying storage
-    array_ptr: * mut Array<Value>,
+    array_ptr: *mut Array<Value>,
 }
 
 impl List {
@@ -132,5 +132,17 @@ impl Markable for List {
 
     fn size_in_bytes(&self) -> usize {
         std::mem::size_of::<Self>()
+    }
+
+    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header) {
+        // replace refs in boxed values
+        for i in 0..self.length {
+            self[i].replace_reference(old_ref, new_ref);
+        }
+
+        // replace array
+        if self.array_ptr.cast::<Header>().cast_const() == old_ref {
+            self.array_ptr = new_ref.cast::<Array<Value>>().cast_mut();
+        }
     }
 }

@@ -56,8 +56,6 @@ impl Heap {
 
     /// TODO:
     /// * evacuate objects
-    /// * locate concerned block and mark it
-    /// * test !
     pub fn mark_value(&mut self, value: &Value, mark: bool) {
         let mut object_ptrs: Vec<*const Header> = Vec::new();
 
@@ -95,7 +93,7 @@ impl Heap {
                             let string = obj_header.cast::<Str>();
                             block_header.mark_lines(obj_header, (*string).size_in_bytes());
                         }
-                        Object::Tombstone(_new_ref) => {
+                        Object::Tombstone => {
                             // swap `ptr` with `new_ref` in `previous.unwrap()`
                             todo!()
                         }

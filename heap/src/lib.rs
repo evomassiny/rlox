@@ -7,8 +7,10 @@ mod heap_objects;
 mod lists;
 mod strings;
 mod values;
+mod tombstones;
 
 use crate::arrays::Array;
+use crate::tombstones::Tombstone;
 pub use crate::boxed_values::BoxedValue;
 pub use crate::heap::{Heap, HeapError};
 pub use crate::lists::List;
@@ -49,7 +51,6 @@ fn test_alloc_array() {
         *array.get_mut(0) = 555;
         assert_eq!(*array.get(0), 555);
         assert_eq!(*array.get(1), 666);
-
     };
 }
 

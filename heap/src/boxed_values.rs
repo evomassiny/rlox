@@ -62,4 +62,8 @@ impl Markable for BoxedValue {
     fn size_in_bytes(&self) -> usize {
         std::mem::size_of::<Self>()
     }
+
+    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header) {
+        self.value.replace_reference(old_ref, new_ref);
+    }
 }
