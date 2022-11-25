@@ -20,17 +20,7 @@ impl Value {
             Value::Nil | Value::Float(_) | Value::Int(_) | Value::Bool(_) => {}
             // append List pointer
             Value::List(ptr) => {
-                // SAFETY:
-                // This is safe because we assert that the value pointer live as long as
-                // this value
-
-                unsafe {
-                    dbg!(&*ptr);
-                }; // HERE (*ptr).header has already been zeroed
                 object_ptrs.push(ptr.cast::<Header>());
-                unsafe {
-                    dbg!(&*ptr);
-                };
             }
             // append Str pointer
             Value::Str(ptr) => {

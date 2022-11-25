@@ -27,6 +27,7 @@ impl Tombstone {
         }
     }
 }
+
 impl Markable for Tombstone {
     /// collect references objects for marking
     fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
