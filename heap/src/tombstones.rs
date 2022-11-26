@@ -1,19 +1,21 @@
 use crate::heap::{Heap, HeapError};
-use crate::heap_objects::{Object, Header, Markable};
+use crate::heap_objects::{Header, Markable, Object};
 
 /// This object is what we replace an object with when we
 /// evacuate an object.
 /// NOTE: it must be the smallest object kind,
 /// as it is written into the same slice as the object its replacing.
 #[repr(C)]
-pub (crate) struct Tombstone {
+pub(crate) struct Tombstone {
     pub header: Header,
     pub object_ptr: *const Header,
 }
 impl Tombstone {
-
     /// Allocate new Tombstone into `heap`
-    pub fn new<'a, 'b>(heap: &'a mut Heap, object_ptr: *const Header) -> Result<&'b mut Self, HeapError> {
+    pub fn new<'a, 'b>(
+        heap: &'a mut Heap,
+        object_ptr: *const Header,
+    ) -> Result<&'b mut Self, HeapError> {
         let size = std::mem::size_of::<Self>();
         let ptr = heap.alloc(size)?;
         unsafe {
@@ -49,6 +51,4 @@ impl Markable for Tombstone {
             self.object_ptr = new_ref;
         }
     }
-
 }
-

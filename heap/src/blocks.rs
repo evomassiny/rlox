@@ -1,3 +1,4 @@
+use crate::block_headers::{BlockHeader, BLOCK_HEADER_SIZE_IN_LINE};
 use crate::heap_objects::Header;
 use std::alloc::{alloc, dealloc, Layout};
 use std::ops::Add;
@@ -19,15 +20,8 @@ pub enum BlockError {
 /// use 2**15 bytes for each block (32 kB)
 pub const BLOCK_SIZE: usize = 1 << 15;
 
-// Because blocks are aligned on their size,
-// removing the lower bit of an allocated object
-// will return the addr of the header it belongs to.
-pub const MASK_LOWER_BLOCK_BITS: usize = !(BLOCK_SIZE - 1);
-/// (*object) & MASK_UPPER_BLOCK_BITS => offset from object start
-pub const MASK_UPPER_BLOCK_BITS: usize = BLOCK_SIZE - 1;
-
-/// use 2**8 bytes for each line
-pub const LINE_SIZE_BITS: usize = 8;
+/// use 2**7 bytes for each line
+pub const LINE_SIZE_BITS: usize = 7;
 /// use lines of 128 bytes
 pub const LINE_SIZE: usize = 1 << LINE_SIZE_BITS;
 /// number of line per block, 256.
@@ -81,11 +75,12 @@ impl Block {
         }
     }
 
-    /// returns a pointer to a slice of bytes that can contains an object of `alloc_size`.
+    /// returns a pointer to a slice of bytes
+    /// that can contains an object of `alloc_size`.
     pub fn claim_slot(&mut self, alloc_size: usize) -> Option<InBlockPtr> {
         let mut next_bump = self.cursor + alloc_size;
         // check is the object would fit in the empty slice pointed by self.cursor
-        // if so, lookup for the next hole
+        // if not, lookup for the next hole
         while next_bump > self.limit {
             if !next_bump.in_block() {
                 return None;
@@ -108,16 +103,12 @@ impl Block {
     pub fn allocate() -> Result<Self, BlockError> {
         let mut block = Self {
             ptr: Self::alloc_block()?,
-            cursor: BlockOffset::new(LINE_SIZE), // first line contains header
+            // first lines contains header
+            cursor: BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE),
             limit: BlockOffset::new(BLOCK_SIZE),
         };
         // intialize block header by zero-ing it
-        for line_marks in block.header_mut().line_marks.iter_mut() {
-            *line_marks = false;
-        }
-        // mark the first line as full,
-        // because it contains the BlockHeader itself.
-        block.header_mut().line_marks[0] = true;
+        block.header_mut().reset();
         Ok(block)
     }
 
@@ -141,14 +132,14 @@ impl Block {
 
     /// return in a state as if the block did not contain any live
     /// object, without actually touching the objects.
-    pub fn reset_marks(&mut self) {
-        self.header_mut().reset_marks();
-        dbg!(std::mem::size_of::<BlockHeader>());
+    pub fn reset(&mut self) {
+        self.header_mut().reset();
     }
 
     /// find the first hole in the block
     pub fn recompute_limits(&mut self) {
-        match self.header().find_next_available_hole(self.limit) {
+        let offset_to_data = BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE);
+        match self.header().find_next_available_hole(offset_to_data) {
             Some((cursor, limit)) => {
                 self.cursor = cursor;
                 self.limit = limit;
@@ -213,131 +204,4 @@ impl Add<usize> for BlockOffset {
     fn add(self, other: usize) -> Self {
         Self(self.0 + other)
     }
-}
-
-/// BlockHeader, first bytes of a Block,
-/// Contains an array of marks,
-/// one per line.
-/// If a line is "marked", it means that it contains
-/// a live objects
-#[derive(Debug)]
-#[repr(C)]
-pub struct BlockHeader {
-    /// keeps track of which section (called line) contains live objects
-    pub line_marks: [bool; LINE_COUNT],
-}
-impl BlockHeader {
-    /// starting from the offset `starting_at` locate the next hole,
-    /// based on the marks of `self.line_marks`
-    /// return its start and end offset
-    pub fn find_next_available_hole(
-        &self,
-        starting_at: BlockOffset,
-    ) -> Option<(BlockOffset, BlockOffset)> {
-        // looks for a window of N lines which are unmarked
-
-        // same as starting_at / LINE_SIZE
-        let mut current_line = starting_at.line_index();
-
-        // loop over markers, to find the start of an hole
-        'scan_for_start: loop {
-            if current_line >= LINE_COUNT {
-                return None;
-            }
-            if self.line_marks[current_line] {
-                // skip one line,
-                // When we mark a line, we consider that the object
-                // that it contains might spill into the next one.
-                // This means that each
-                current_line += 2;
-                continue 'scan_for_start;
-            }
-            break;
-        }
-        let hole_start = BlockOffset::from_line_index(current_line);
-
-        // then locate the end of the hole
-        let mut hole_size: usize = 1;
-        'scan_for_end: loop {
-            current_line += 1;
-            if current_line >= LINE_COUNT || self.line_marks[current_line] {
-                break 'scan_for_end;
-            }
-            hole_size += 1;
-        }
-        let hole_end = hole_start + BlockOffset::from_line_index(hole_size);
-        Some((hole_start, hole_end))
-    }
-
-    /// Return the addr of the block header related to the object pointed by `ptr`
-    /// (rely on block alignement for this)
-    ///
-    /// NOTE:
-    /// the lifetime of the returned value is not actually 'static,
-    /// it is tied to the lifetime of its block.
-    /// But the compiler does not know that.
-    pub unsafe fn from_object_ptr(ptr: *const Header) -> &'static mut BlockHeader {
-        // Because blocks are aligned on their size,
-        // removing the lower bit of an alloacted object
-        // will return the addr of the header it belongs to.
-
-        let block_start = (ptr as usize) & MASK_LOWER_BLOCK_BITS;
-        let block_header_ptr = block_start as *mut BlockHeader;
-        &mut *block_header_ptr
-    }
-
-    pub fn mark_lines(&mut self, object_ptr: *const Header, object_size: usize) {
-        // because block are aligned, lower bits are equivalent to  byte offset.
-        let byte_offset = (object_ptr as usize) & MASK_UPPER_BLOCK_BITS;
-        // get line indices
-        let start = byte_offset >> LINE_SIZE_BITS;
-        let end = (byte_offset + object_size) >> LINE_SIZE_BITS;
-        for line_idx in start..=end {
-            // SAFETY:
-            // because of the above mask, we cannot be
-            // out of bound.
-            unsafe {
-                *self.line_marks.get_unchecked_mut(line_idx) = true;
-            }
-        }
-    }
-
-    pub fn reset_marks(&mut self) {
-        // the first line is `self`, so it's never free
-        self.line_marks[0] = true;
-        for mark in self.line_marks.iter_mut() {
-            *mark = false;
-        }
-    }
-}
-
-#[test]
-fn block_header_size() {
-    /// Assert that the Header fits in ONE line.
-    assert!(std::mem::size_of::<BlockHeader>() <= LINE_SIZE);
-}
-
-#[test]
-fn hole_lookup() {
-    let mut block = Block::allocate().unwrap();
-    block.header_mut().line_marks[10] = true; // mark line as "filled"
-    assert_eq!(
-        block.header().find_next_available_hole(BlockOffset::new(0)),
-        Some((
-            BlockOffset::from_line_index(2),
-            BlockOffset::from_line_index(10)
-        )),
-    );
-
-    // assert that a marked line also invalidate the following one.
-    block.header_mut().line_marks[15] = true;
-    assert_eq!(
-        block
-            .header()
-            .find_next_available_hole(BlockOffset::from_line_index(10)),
-        Some((
-            BlockOffset::from_line_index(12),
-            BlockOffset::from_line_index(15),
-        )),
-    );
 }

@@ -1,20 +1,21 @@
 mod align;
 mod arrays;
+mod block_headers;
 mod blocks;
 mod boxed_values;
 mod heap;
 mod heap_objects;
 mod lists;
 mod strings;
-mod values;
 mod tombstones;
+mod values;
 
 use crate::arrays::Array;
-use crate::tombstones::Tombstone;
 pub use crate::boxed_values::BoxedValue;
 pub use crate::heap::{Heap, HeapError};
 pub use crate::lists::List;
 pub use crate::strings::Str;
+use crate::tombstones::Tombstone;
 pub use crate::values::Value;
 
 use crate::lists::LIST_START_CAPACITY;

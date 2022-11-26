@@ -1,5 +1,6 @@
 use crate::arrays::Array;
-use crate::blocks::{Block, BlockError, BlockHeader, InBlockPtr};
+use crate::block_headers::BlockHeader;
+use crate::blocks::{Block, BlockError, InBlockPtr};
 use crate::boxed_values::BoxedValue;
 use crate::heap_objects::{Header, Markable, Object};
 use crate::lists::List;
@@ -15,6 +16,7 @@ pub enum HeapError {
 /// GC-ed Heap
 pub struct Heap {
     blocks: Vec<Block>,
+    //mark_histogram: [usize; LINE_COUNT];
 }
 
 impl Heap {
@@ -45,7 +47,7 @@ impl Heap {
 
     pub fn start_gc(&mut self) {
         for block in self.blocks.iter_mut() {
-            block.reset_marks();
+            block.reset();
         }
     }
     pub fn end_gc(&mut self) {
