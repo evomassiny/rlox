@@ -22,7 +22,7 @@ impl Tombstone {
             let tombstone = ptr.as_ptr().cast::<Self>();
             (*tombstone).header = Header {
                 kind: Object::Tombstone,
-                mark: false,
+                mark: heap.unmarked_flag(),
             };
             (*tombstone).object_ptr = object_ptr;
             Ok(&mut *tombstone)

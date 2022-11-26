@@ -33,7 +33,7 @@ impl Str {
             let mut string = ptr.as_ptr().cast::<Self>();
             (*string).header = Header {
                 kind: Object::Str,
-                mark: false,
+                mark: heap.unmarked_flag(),
             };
             (*string).length = bytes.len();
             // write byte array

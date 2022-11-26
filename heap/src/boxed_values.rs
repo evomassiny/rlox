@@ -20,7 +20,7 @@ impl BoxedValue {
             let mut boxed_value = ptr.as_ptr().cast::<Self>();
             (*boxed_value).header = Header {
                 kind: Object::BoxedValue,
-                mark: false,
+                mark: heap.unmarked_flag(),
             };
             (*boxed_value).value = value;
             Ok(&mut *boxed_value)

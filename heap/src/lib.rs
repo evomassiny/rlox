@@ -114,7 +114,7 @@ fn test_marking() {
     let list_value = Value::List(addr_of!(*list) as *const List);
 
     heap.start_gc();
-    heap.mark_value(&list_value, true);
+    heap.mark_value(&list_value);
     heap.end_gc();
 
     assert_eq!(list.len(), 2);

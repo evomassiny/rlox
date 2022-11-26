@@ -1,3 +1,5 @@
 This repo contains a WIP implementation of the `lox` programing language,
-it is inspired by the `clox` implentation of the *Crafting interpreters* book, 
-and [the rust-hosted langauge guide](https://rust-hosted-langs.github.io/book/).
+it is inspired by the `clox` implentation of the *Crafting interpreters* book.
+
+So far, it differs from the original implementation on the following point:
+* it uses a compacting garbage collector based on the "immix" implementation.

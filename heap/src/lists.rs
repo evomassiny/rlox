@@ -31,7 +31,7 @@ impl List {
             let mut list = ptr.as_ptr().cast::<Self>();
             (*list).header = Header {
                 kind: Object::List,
-                mark: false,
+                mark: heap.unmarked_flag(),
             };
             (*list).length = 0;
             (*list).capacity = LIST_START_CAPACITY;

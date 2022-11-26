@@ -3,14 +3,27 @@ use crate::heap_objects::Header;
 use std::mem::size_of;
 
 /// Number of lines taken by the block header
-pub const BLOCK_HEADER_SIZE_IN_LINE: usize = (size_of::<BlockHeader>() + LINE_SIZE - 1) / LINE_SIZE;
+pub(crate) const BLOCK_HEADER_SIZE_IN_LINE: usize =
+    (size_of::<BlockHeader>() + LINE_SIZE - 1) / LINE_SIZE;
 
 // Because blocks are aligned on their size,
 // removing the lower bit of an allocated object
 // will return the addr of the header it belongs to.
-pub const MASK_LOWER_BLOCK_BITS: usize = !(BLOCK_SIZE - 1);
+pub(crate) const MASK_LOWER_BLOCK_BITS: usize = !(BLOCK_SIZE - 1);
 /// (*object) & MASK_UPPER_BLOCK_BITS => offset from object start
-pub const MASK_UPPER_BLOCK_BITS: usize = BLOCK_SIZE - 1;
+pub(crate) const MASK_UPPER_BLOCK_BITS: usize = BLOCK_SIZE - 1;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum BlockState {
+    Free,
+    Full,
+    PartiallyFull {
+        hole_count: usize,
+        mark_count: usize,
+    },
+    /// Being emptied by GC
+    Evacuating,
+}
 
 /// BlockHeader, first bytes of a Block,
 /// Contains an array of marks,
@@ -18,19 +31,17 @@ pub const MASK_UPPER_BLOCK_BITS: usize = BLOCK_SIZE - 1;
 /// If a line is "marked", it means that it contains
 /// a live objects
 #[derive(Debug)]
-#[repr(C)]
-pub struct BlockHeader {
+pub(crate) struct BlockHeader {
     /// keeps track of which section (called line) contains live objects
     pub line_marks: [bool; LINE_COUNT],
     /// when the GC decide to evacuate this block, we flag it here.
-    pub evacuating: bool,
-    pub hole_count: usize,
+    pub state: BlockState,
 }
 impl BlockHeader {
     /// starting from the offset `starting_at` locate the next hole,
     /// based on the marks of `self.line_marks`
     /// return its start and end offset
-    pub fn find_next_available_hole(
+    pub(crate) fn find_next_available_hole(
         &self,
         starting_at: BlockOffset,
     ) -> Option<(BlockOffset, BlockOffset)> {
@@ -69,7 +80,7 @@ impl BlockHeader {
     /// the lifetime of the returned value is not actually 'static,
     /// it is tied to the lifetime of its block.
     /// But the compiler does not know that.
-    pub unsafe fn from_object_ptr(ptr: *const Header) -> &'static mut BlockHeader {
+    pub(crate) unsafe fn from_object_ptr(ptr: *const Header) -> &'static mut BlockHeader {
         // Because blocks are aligned on their size,
         // removing the lower bit of an alloacted object
         // will return the addr of the header it belongs to.
@@ -79,7 +90,7 @@ impl BlockHeader {
         &mut *block_header_ptr
     }
 
-    pub fn mark_lines(&mut self, object_ptr: *const Header, object_size: usize) {
+    pub(crate) fn mark_lines(&mut self, object_ptr: *const Header, object_size: usize) {
         // because block are aligned, lower bits are equivalent to  byte offset.
         let byte_offset = (object_ptr as usize) & MASK_UPPER_BLOCK_BITS;
         // get line indices
@@ -96,7 +107,7 @@ impl BlockHeader {
     }
 
     /// reset line marks and hole count, as if the block contained no live object
-    pub fn reset(&mut self) {
+    pub(crate) fn clear(&mut self) {
         // the first lines of the block are taken by `self`,
         // so it's never free
         for line_idx in 0..BLOCK_HEADER_SIZE_IN_LINE {
@@ -106,15 +117,13 @@ impl BlockHeader {
         for line_idx in BLOCK_HEADER_SIZE_IN_LINE..LINE_COUNT {
             self.line_marks[line_idx] = false;
         }
-        // if the block is free, it only contains one big hole
-        self.hole_count = 1;
-        self.evacuating = false;
+        self.state = BlockState::Free;
     }
 
     /// Returns
     /// * the number of holes (nb of group of contiguous unmarked lines),
     /// * the number of marked lines
-    pub fn count_holes_and_marked_lines(&self) -> (usize, usize) {
+    pub(crate) fn count_holes_and_marked_lines(&self) -> (usize, usize) {
         let mut hole_count = 0;
         let mut marked_count = 0;
         let mut previous_was_marked = true;
@@ -128,6 +137,19 @@ impl BlockHeader {
             previous_was_marked = self.line_marks[line_idx];
         }
         (hole_count, marked_count)
+    }
+
+    /// set `self.state` according to number of marks/holes
+    pub(crate) fn update_state(&mut self) {
+        const DATA_LINE_COUNT: usize = LINE_COUNT - BLOCK_HEADER_SIZE_IN_LINE;
+        self.state = match self.count_holes_and_marked_lines() {
+            (0, _) => BlockState::Full,
+            (1, mark_count) if mark_count == DATA_LINE_COUNT => BlockState::Free,
+            (hole_count, mark_count) => BlockState::PartiallyFull {
+                hole_count,
+                mark_count,
+            },
+        };
     }
 }
 
@@ -143,10 +165,9 @@ fn block_header_size() {
 fn hole_lookup() {
     let mut block_header = BlockHeader {
         line_marks: [false; LINE_COUNT],
-        hole_count: 0,
-        evacuating: false,
+        state: BlockState::Free,
     };
-    block_header.reset();
+    block_header.clear();
 
     block_header.line_marks[10] = true; // mark line as "filled"
     assert_eq!(
@@ -166,4 +187,29 @@ fn hole_lookup() {
             BlockOffset::from_line_index(15),
         )),
     );
+}
+
+#[test]
+fn holes_and_marks_count() {
+    let mut block_header = BlockHeader {
+        line_marks: [false; LINE_COUNT],
+        state: BlockState::Free,
+    };
+    block_header.clear();
+
+    // fill up 2 chunks of 2 lines
+    block_header.line_marks[10] = true;
+    block_header.line_marks[11] = true;
+
+    block_header.line_marks[20] = true;
+    block_header.line_marks[21] = true;
+
+    let (hole_count, marked_count) = block_header.count_holes_and_marked_lines();
+    // in total we should expect 3 holes
+    // * start to line 10
+    // * line 12 to line 20
+    // * line 22 to end
+    assert_eq!(hole_count, 3);
+    // and 4 marked lines
+    assert_eq!(marked_count, 4);
 }

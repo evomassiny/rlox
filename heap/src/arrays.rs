@@ -40,7 +40,7 @@ impl<T: Sized> Array<T> {
             (*array).full_size = size;
             (*array).header = Header {
                 kind: Object::Array,
-                mark: false,
+                mark: heap.unmarked_flag(),
             };
             // (*array)._buffer does not need to be initialized
             Ok(&mut *array)

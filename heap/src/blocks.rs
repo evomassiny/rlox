@@ -77,7 +77,7 @@ impl Block {
 
     /// returns a pointer to a slice of bytes
     /// that can contains an object of `alloc_size`.
-    pub fn claim_slot(&mut self, alloc_size: usize) -> Option<InBlockPtr> {
+    pub(crate) fn claim_slot(&mut self, alloc_size: usize) -> Option<InBlockPtr> {
         let mut next_bump = self.cursor + alloc_size;
         // check is the object would fit in the empty slice pointed by self.cursor
         // if not, lookup for the next hole
@@ -100,7 +100,7 @@ impl Block {
     }
 
     /// Allocate a new block of size `size`
-    pub fn allocate() -> Result<Self, BlockError> {
+    pub(crate) fn allocate() -> Result<Self, BlockError> {
         let mut block = Self {
             ptr: Self::alloc_block()?,
             // first lines contains header
@@ -108,13 +108,13 @@ impl Block {
             limit: BlockOffset::new(BLOCK_SIZE),
         };
         // intialize block header by zero-ing it
-        block.header_mut().reset();
+        block.header_mut().clear();
         Ok(block)
     }
 
     /// return ref to the BlockHeader
     /// (the first LINE_SIZE bytes of the block)
-    pub fn header(&self) -> &BlockHeader {
+    pub(crate) fn header(&self) -> &BlockHeader {
         unsafe {
             let header = self.ptr.as_ptr().cast::<BlockHeader>();
             &*header
@@ -123,7 +123,7 @@ impl Block {
 
     /// return exclusize ref to the BlockHeader
     /// (the first LINE_SIZE bytes of the block)
-    pub fn header_mut(&mut self) -> &mut BlockHeader {
+    pub(crate) fn header_mut(&mut self) -> &mut BlockHeader {
         unsafe {
             let header = self.ptr.as_ptr().cast::<BlockHeader>();
             &mut *header
@@ -132,12 +132,12 @@ impl Block {
 
     /// return in a state as if the block did not contain any live
     /// object, without actually touching the objects.
-    pub fn reset(&mut self) {
-        self.header_mut().reset();
+    pub(crate) fn clear(&mut self) {
+        self.header_mut().clear();
     }
 
     /// find the first hole in the block
-    pub fn recompute_limits(&mut self) {
+    pub(crate) fn recompute_limits(&mut self) {
         let offset_to_data = BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE);
         match self.header().find_next_available_hole(offset_to_data) {
             Some((cursor, limit)) => {
@@ -160,10 +160,10 @@ impl Drop for Block {
 
 /// an offset address, relative to a `Block` start address
 #[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Clone, Copy)]
-pub struct BlockOffset(usize);
+pub(crate) struct BlockOffset(usize);
 impl BlockOffset {
     /// returns the absolute address of the data pointed by `self`
-    pub fn absolute_ptr(&self, block: &Block) -> InBlockPtr {
+    pub(crate) fn absolute_ptr(&self, block: &Block) -> InBlockPtr {
         unsafe {
             let self_ptr = block.ptr.as_ptr().add(self.0);
             // block.ptr is non-null => so is self_ptr
@@ -172,21 +172,21 @@ impl BlockOffset {
     }
 
     /// return the index of the line that contains self in a block.
-    pub fn line_index(&self) -> usize {
+    pub(crate) fn line_index(&self) -> usize {
         self.0 >> LINE_SIZE_BITS
     }
 
     /// return an offset relative to the start of the block,
     /// from a block line index.
-    pub fn from_line_index(index: usize) -> Self {
+    pub(crate) fn from_line_index(index: usize) -> Self {
         Self(index << LINE_SIZE_BITS)
     }
 
-    pub fn in_block(&self) -> bool {
+    pub(crate) fn in_block(&self) -> bool {
         self.0 < BLOCK_SIZE
     }
 
-    pub fn new(offset: usize) -> Self {
+    pub(crate) fn new(offset: usize) -> Self {
         Self(offset)
     }
 }
