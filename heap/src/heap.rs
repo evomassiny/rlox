@@ -26,8 +26,8 @@ pub struct Heap {
     // (used in the evacutation selection heuristic)
     // (called `mark histogram` in the original paper)
     marked_lines_by_holes_count: [usize; MAX_NB_OF_HOLE],
-    /// flag used to mark live object,
-    /// we flip it during each collection
+    // flag used to mark live object,
+    // we flip it before each collection
     live_object_mark: bool,
 }
 
@@ -77,15 +77,53 @@ impl Heap {
         self.live_object_mark = !self.live_object_mark;
     }
 
-    // TODO!
-    // compute available histogram,
-    // and select Block for evacuation.
+    fn mark_blocks_for_evacuation(&mut self) {
+        // build `available` histogram
+        let mut free_count_by_hole_count = [0; MAX_NB_OF_HOLE];
+        for block in self.blocks.iter() {
+            match block.header().state {
+                BlockState::PartiallyFull {
+                    hole_count,
+                    mark_count,
+                } => {
+                    free_count_by_hole_count[hole_count] += LINE_COUNT - mark_count;
+                }
+                _ => {}
+            }
+        }
+        // `selected_threshold` acts as a breakpoint value, all blocks
+        // above or equal to it will be selected for evacution
+        let mut selected_threshold: Option<usize> = None;
+        let mut available_acc = 0;
+        let mut required_acc = 0;
+        for hole_count in (MAX_NB_OF_HOLE - 1)..=0 {
+            available_acc += free_count_by_hole_count[hole_count];
+            required_acc += self.marked_lines_by_holes_count[hole_count];
+            if required_acc > available_acc {
+                selected_threshold = Some(hole_count);
+            }
+        }
+        // mark blocks
+        if let Some(threshold) = selected_threshold {
+            for block in self.blocks.iter_mut() {
+                let header = block.header_mut();
+                header.state = match header.state {
+                    BlockState::PartiallyFull { hole_count, .. } if hole_count >= threshold => {
+                        BlockState::Evacuating
+                    }
+                    state => state,
+                }
+            }
+        }
+    }
+
     pub fn start_gc(&mut self) {
-        self.rotate_mark_flag();
+        self.mark_blocks_for_evacuation();
         // clear object marks
         for block in self.blocks.iter_mut() {
             block.clear();
         }
+        self.rotate_mark_flag();
     }
 
     // * re compute `self.marked_lines_by_holes_count`
@@ -112,7 +150,7 @@ impl Heap {
     }
 
     /// TODO:
-    /// * evacuate objects
+    /// * evacuate objects from Blocks in `Evacuating` state.
     pub fn mark_value(&mut self, value: &Value) {
         let mut object_ptrs: Vec<*const Header> = Vec::new();
 
@@ -128,7 +166,7 @@ impl Heap {
                     (*obj_header).mark = mark;
                     // get the block header so we can mark the lines containing the object
                     // mark line, so we don't reclaim its memory for another object
-                    let block_header: &mut BlockHeader = BlockHeader::from_object_ptr(obj_header);
+                    let block_header = BlockHeader::from_object_ptr(obj_header);
                     match (*obj_header).kind {
                         Object::BoxedValue => {
                             let boxed_value = obj_header.cast::<BoxedValue>();
