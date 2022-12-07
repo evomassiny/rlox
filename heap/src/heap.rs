@@ -5,6 +5,7 @@ use crate::boxed_values::BoxedValue;
 use crate::heap_objects::{Header, Markable, Object};
 use crate::lists::List;
 use crate::strings::Str;
+use crate::tombstones::Tombstone;
 use crate::values::Value;
 
 #[derive(Debug)]
@@ -161,42 +162,83 @@ impl Heap {
         while let Some(obj_header) = object_ptrs.pop() {
             let obj_header = obj_header.cast_mut();
             unsafe {
-                if (*obj_header).mark != mark {
-                    // mark Object, so we don't crawl it any
-                    (*obj_header).mark = mark;
-                    // get the block header so we can mark the lines containing the object
-                    // mark line, so we don't reclaim its memory for another object
-                    let block_header = BlockHeader::from_object_ptr(obj_header);
-                    match (*obj_header).kind {
-                        Object::BoxedValue => {
-                            let boxed_value = obj_header.cast::<BoxedValue>();
-                            (*boxed_value).collect_references(&mut object_ptrs);
-                            // mark
-                            block_header.mark_lines(obj_header, (*boxed_value).size_in_bytes());
-                        }
-                        Object::List => {
-                            let list = obj_header.cast::<List>();
-                            (*list).collect_references(&mut object_ptrs);
-                            block_header.mark_lines(obj_header, (*list).size_in_bytes());
-                        }
-                        Object::Array => {
-                            // here we don't know the type of Array item,
-                            // but we don't access them, so we don't care.
-                            let array = obj_header.cast::<Array<()>>();
-                            block_header.mark_lines(obj_header, (*array).size_in_bytes());
-                        }
-                        Object::Str => {
-                            let string = obj_header.cast::<Str>();
-                            block_header.mark_lines(obj_header, (*string).size_in_bytes());
-                        }
-                        Object::Tombstone => {
-                            // swap `ptr` with `new_ref` in `previous.unwrap()`
-                            todo!()
+                // skip already crawled objects
+                if (*obj_header).mark == mark {
+                    continue;
+                }
+                // mark Object, so we don't crawl it again
+                (*obj_header).mark = mark;
+                // get the block header so we can mark the lines containing the object
+                // mark line, so we don't reclaim its memory for another object
+                let block_header = BlockHeader::from_object_ptr(obj_header);
+                match (*obj_header).kind {
+                    Object::BoxedValue => {
+                        let boxed_value = obj_header.cast::<BoxedValue>();
+                        (*boxed_value).collect_references(&mut object_ptrs);
+                        // mark
+                        block_header.mark_lines(obj_header, (*boxed_value).size_in_bytes());
+                    }
+                    Object::List => {
+                        let list = obj_header.cast::<List>();
+                        (*list).collect_references(&mut object_ptrs);
+                        block_header.mark_lines(obj_header, (*list).size_in_bytes());
+                    }
+                    Object::Array => {
+                        // here we don't know the type of Array item,
+                        // but we don't access them, so we don't care.
+                        let array = obj_header.cast::<Array<()>>();
+                        block_header.mark_lines(obj_header, (*array).size_in_bytes());
+                    }
+                    Object::Str => {
+                        let string = obj_header.cast::<Str>();
+                        block_header.mark_lines(obj_header, (*string).size_in_bytes());
+                    }
+                    Object::Tombstone => {
+                        // swap references in `previous`
+                        let tombstone = obj_header.cast::<Tombstone>();
+                        (*tombstone).collect_references(&mut object_ptrs);
+                        if let Some(previous) = previous {
+                            replace_reference_in_object(
+                                previous.cast_mut(),
+                                obj_header,
+                                (*tombstone).object_ptr,
+                            );
                         }
                     }
-                    previous = Some(obj_header);
                 }
+                previous = Some(obj_header);
             }
+        }
+    }
+}
+
+/// Replace `old_ref` by `new_ref` in the heap
+/// object pointed by `object_to_update`.
+unsafe fn replace_reference_in_object(
+    object: *mut Header,
+    old_ref: *const Header,
+    new_ref: *const Header,
+) {
+    match (*object).kind {
+        Object::BoxedValue => {
+            let boxed_value = object.cast::<BoxedValue>();
+            (*boxed_value).replace_reference(old_ref, new_ref);
+        }
+        Object::List => {
+            let list = object.cast::<List>();
+            (*list).replace_reference(old_ref, new_ref);
+        }
+        Object::Array => {
+            let array = object.cast::<Array<()>>();
+            (*array).replace_reference(old_ref, new_ref);
+        }
+        Object::Str => {
+            let string = object.cast::<Str>();
+            (*string).replace_reference(old_ref, new_ref);
+        }
+        Object::Tombstone => {
+            let tombstone = object.cast::<Tombstone>();
+            (*tombstone).replace_reference(old_ref, new_ref);
         }
     }
 }
