@@ -1,5 +1,6 @@
-use crate::heap::{Heap, HeapError};
-use crate::heap_objects::{Header, Markable, Object};
+use crate::heap::Heap;
+use crate::heap_objects::{Header, Markable, Object, ObjectRef};
+use crate::memory::MemoryError;
 use crate::values::Value;
 use std::convert::{AsMut, AsRef, Into};
 use std::ptr::addr_of;
@@ -13,7 +14,10 @@ pub struct BoxedValue {
 }
 
 impl BoxedValue {
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: Value) -> Result<&'a mut Self, HeapError> {
+    pub fn new<'heap, 'a>(
+        heap: &'heap mut Heap,
+        value: Value,
+    ) -> Result<&'a mut Self, MemoryError> {
         let size: usize = std::mem::size_of::<Self>();
         let ptr = heap.alloc(size)?;
         unsafe {
@@ -55,7 +59,7 @@ impl Markable for BoxedValue {
     /// Arrays might reference other object,
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handle it.
-    fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
+    fn collect_references(&self, object_ptrs: &mut Vec<ObjectRef>) {
         self.value.collect_references(object_ptrs);
     }
 

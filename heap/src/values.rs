@@ -1,7 +1,7 @@
-use crate::heap_objects::{Header, Markable};
+use crate::heap_objects::{Header, Markable, ObjectRef};
 use crate::lists::List;
 use crate::strings::Str;
-use std::ptr::addr_of;
+use std::ptr::{addr_of, NonNull};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Value {
@@ -14,21 +14,29 @@ pub enum Value {
 }
 
 impl Value {
-    pub(crate) fn collect_references(&self, object_ptrs: &mut Vec<*const Header>) {
+    pub(crate) fn collect_references(&self, object_ptrs: &mut Vec<ObjectRef>) {
+        let self_ptr = unsafe { Some(NonNull::new_unchecked(self as *const _ as *mut Header)) };
         match *self {
             // base value
             Value::Nil | Value::Float(_) | Value::Int(_) | Value::Bool(_) => {}
             // append List pointer
             Value::List(ptr) => {
-                object_ptrs.push(ptr.cast::<Header>());
+                object_ptrs.push(ObjectRef {
+                    origin: self_ptr,
+                    dest: unsafe { NonNull::new_unchecked(ptr.cast::<Header>().cast_mut()) },
+                });
             }
             // append Str pointer
             Value::Str(ptr) => {
                 // SAFETY:
                 // This is safe because we assert that the value pointer live as long as
                 // this value
-                let str_header_ptr = unsafe { addr_of!((*ptr).header) };
-                object_ptrs.push(str_header_ptr);
+                let str_header_ptr =
+                    unsafe { NonNull::new_unchecked(addr_of!((*ptr).header).cast_mut()) };
+                object_ptrs.push(ObjectRef {
+                    origin: self_ptr,
+                    dest: str_header_ptr,
+                });
             }
         }
     }

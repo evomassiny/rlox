@@ -3,17 +3,20 @@ mod arrays;
 mod block_headers;
 mod blocks;
 mod boxed_values;
+mod compactor;
 mod heap;
 mod heap_objects;
 mod lists;
+mod memory;
 mod strings;
 mod tombstones;
 mod values;
 
 use crate::arrays::Array;
 pub use crate::boxed_values::BoxedValue;
-pub use crate::heap::{Heap, HeapError};
+pub use crate::heap::Heap;
 pub use crate::lists::List;
+pub use crate::memory::MemoryError;
 pub use crate::strings::Str;
 use crate::tombstones::Tombstone;
 pub use crate::values::Value;
@@ -113,9 +116,9 @@ fn test_marking() {
     list.push(&mut heap, Value::Str(str_a as *const Str));
     let list_value = Value::List(addr_of!(*list) as *const List);
 
-    heap.start_gc();
-    heap.mark_value(&list_value);
-    heap.end_gc();
+    heap.init_gc_cycle();
+    heap.mark(&list_value);
+    heap.end_gc_cycle();
 
     assert_eq!(list.len(), 2);
 }

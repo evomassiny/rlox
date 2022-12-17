@@ -1,6 +1,7 @@
 use crate::align::padded_offset;
-use crate::heap::{Heap, HeapError};
-use crate::heap_objects::{Header, Markable, Object};
+use crate::heap::Heap;
+use crate::heap_objects::{Header, Markable, Object, ObjectRef};
+use crate::memory::MemoryError;
 use std::convert::AsRef;
 use std::marker::PhantomData;
 use std::ptr::{addr_of, addr_of_mut};
@@ -25,7 +26,7 @@ pub struct Str {
 }
 
 impl Str {
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, HeapError> {
+    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, MemoryError> {
         let bytes = value.as_bytes();
         let size: usize = OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
         let ptr = heap.alloc(size)?;
@@ -59,7 +60,7 @@ impl AsRef<str> for Str {
 
 impl Markable for Str {
     /// Str does not reference any other data, so this is a NO-OP
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) {}
+    fn collect_references(&self, _object_ptrs: &mut Vec<ObjectRef>) {}
 
     fn size_in_bytes(&self) -> usize {
         // OFFSET_TO_BUFFER includes padding

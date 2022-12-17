@@ -137,7 +137,7 @@ impl Block {
     }
 
     /// find the first hole in the block
-    pub(crate) fn recompute_limits(&mut self) {
+    pub(crate) fn update_hole_cursor(&mut self) {
         let offset_to_data = BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE);
         match self.header().find_next_available_hole(offset_to_data) {
             Some((cursor, limit)) => {

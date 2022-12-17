@@ -1,6 +1,7 @@
 use crate::align::padded_offset;
-use crate::heap::{Heap, HeapError};
-use crate::heap_objects::{Header, Markable, Object};
+use crate::heap::Heap;
+use crate::heap_objects::{Header, Markable, Object, ObjectRef};
+use crate::memory::MemoryError;
 use std::convert::AsRef;
 use std::marker::{PhantomData, Sized};
 use std::ptr::addr_of;
@@ -30,7 +31,7 @@ pub(crate) struct Array<T> {
 }
 
 impl<T: Sized> Array<T> {
-    pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, HeapError> {
+    pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, MemoryError> {
         let offset_to_buffer: usize = padded_offset::<Header, usize>()    // header size + padding to `full_size`
             + padded_offset::<usize, T>(); // `full_size` size + padding to buffer
         let size = offset_to_buffer + array_len * std::mem::size_of::<T>();
@@ -79,7 +80,7 @@ impl<T> Markable for Array<T> {
     /// Arrays might reference other object,
     /// but indirectly, though a List.
     /// the `Markable` impl for `List` handles it.
-    fn collect_references(&self, _object_ptrs: &mut Vec<*const Header>) {
+    fn collect_references(&self, _object_ptrs: &mut Vec<ObjectRef>) {
         // managed by the object that own the array
     }
 
