@@ -3,7 +3,7 @@ use super::cursor::{Cursor, ParseError};
 /// rlox is a single pass compiler,
 /// eg: the parsing and compiling are done in one go.
 /// The `Compiler`struct does both.
-use crate::lexer::{TokenKind, Tokenize};
+use lexer::{TokenKind, Tokenize};
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.

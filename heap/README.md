@@ -1,5 +1,5 @@
 # Heap
-This crate loosely follows the implemenation of the "Immix" garbage collector,
+This crate loosely follows the implementation of the "Immix" garbage collector,
 a "mark and compact" GC.
 
 Here is how it works:
@@ -9,7 +9,7 @@ Here is how it works:
 * when marking we annotate each block with few statistics describing its usage,
 * when we detect `fragmented` blocks, we mark them as such.
 * In the following marking pass, when we encounter an object lying in a `fragmented` block,
-  we copy it into a non-`fragemented` block, and leave in its place a reference to the 
+  we copy it into a non-`fragmented` block, and leave in its place a reference to the 
   new location.
 * While traversing the objects graph in the marking phase, 
   when we encounter "reference to a new object location",
@@ -27,7 +27,7 @@ Heap allocates memory by `Block`s, a block contain:
  * a `BlockHeader` that describes how "full" a block is.
 
 `BlockHeader`s are located on the very start of each block,
-and `Block` are **aligned on their size**.
+and `Block`s are **aligned on their size**.
 
 This makes it trivial to obtain the address of the `BlockHeader` 
 related to the `Block` where an object is allocated
@@ -39,8 +39,8 @@ This implementation relies (a lot) on this property.
 
 # About heap allocated Objects
 
-All objects allocated in a block is annotated with a `Header`,
-we store the type the of the object inside, along with a "mark" flag (used it the GC cycle).
+All objects allocated in a block are annotated with a `Header`,
+we store the type of the object inside, along with a "mark" flag (used in the GC cycle).
 
 
 # Heuristics for "evacuation"

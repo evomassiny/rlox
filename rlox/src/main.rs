@@ -1,7 +1,8 @@
 use clap::Parser as ArgParser;
 
 mod compiler;
-mod lexer;
+
+use lexer;
 
 use crate::compiler::Compiler;
 

@@ -5,16 +5,28 @@ use std::fs::File;
 use std::path::Path;
 
 pub enum ReadError {
+    /// Token buffer is too small to fit that much token,
     PeekTooFar,
     IoError,
 }
 
+/// This trait defines an interface for reading
+/// `char`s from a struct, in a single pass.
 pub trait PeekOffset {
+    /// return the next unparsed `char`, or None if we consumed
+    /// the whole input, update internal cursor.
     fn next(&mut self) -> Option<char>;
+
+    /// return the `index` next unparsed `char`, or None if we consumed
+    /// the whole input, without updating the internal cursor
     fn peek_at(&mut self, index: usize) -> Result<Option<char>, ReadError>;
+
+    /// how many token can be buffered (eg: peeked)
     fn capacity(&self) -> usize;
 }
 
+/// Struct that represents a position of a `char`
+/// in the input source code.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Span {
     pub line: usize,

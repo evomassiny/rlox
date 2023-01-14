@@ -1,5 +1,6 @@
 [workspace]
 members = [
   "heap",
+  "lexer",
   "rlox",
 ]

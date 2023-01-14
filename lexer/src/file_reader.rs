@@ -37,7 +37,7 @@ impl<T: Read> ReaderPeeker<T> {
         match std::str::from_utf8(&self.parse_buffer[..to_parse]) {
             Ok(valid) => {
                 for c in valid.chars() {
-                    self.chars.append(c);
+                    let _ = self.chars.append(c);
                 }
                 self.bytes.drop_n(to_parse);
             }
@@ -48,7 +48,7 @@ impl<T: Read> ReaderPeeker<T> {
                 unsafe {
                     let valid = std::str::from_utf8_unchecked(&self.parse_buffer[..count]);
                     for c in valid.chars() {
-                        self.chars.append(c);
+                        let _ = self.chars.append(c);
                     }
                 }
                 self.bytes.drop_n(count);
@@ -93,7 +93,11 @@ impl<T: Read> PeekOffset for ReaderPeeker<T> {
 #[test]
 fn test_utf8_reader() {
     use std::fs::File;
-    let path = "./test-data/valid-utf8.txt";
+    use std::path::PathBuf;
+
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("test-data/valid-utf8.txt");
+
     let file = File::open(path).expect("Failed to read test file.");
     let mut reader = ReaderPeeker::new(file);
     let mut valid = String::new();
