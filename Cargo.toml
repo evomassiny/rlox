@@ -2,5 +2,6 @@
 members = [
   "heap",
   "lexer",
+  "parser",
   "rlox",
 ]

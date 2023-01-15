@@ -1,7 +1,7 @@
 use super::file_reader::ReaderPeeker;
 use super::source::{PeekOffset, SourceInput, Span};
 use super::str_reader::StrPeeker;
-use super::token::TokenKind;
+use super::token::{TokenKind, Token};
 use std::fs::File;
 
 use std::path::Path;
@@ -9,12 +9,6 @@ use std::path::Path;
 #[derive(Debug, PartialEq, Eq)]
 pub enum LexerError {
     InvalidToken { span: Span },
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub span: Span,
 }
 
 /// This struct handle the lexing

@@ -5,6 +5,6 @@ mod source;
 mod str_reader;
 mod token;
 
-pub use crate::lexer::{Lexer, LexerError, Token, Tokenize};
+pub use crate::lexer::{Lexer, LexerError, Tokenize};
 pub use crate::source::{PeekOffset, Span};
-pub use crate::token::TokenKind;
+pub use crate::token::{TokenKind, Token};

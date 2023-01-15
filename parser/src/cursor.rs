@@ -1,4 +1,4 @@
-use crate::lexer::{LexerError, Token, TokenKind, Tokenize};
+use lexer::{LexerError, Token, TokenKind, Tokenize};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -9,6 +9,8 @@ pub enum ParseError {
     CompilationError,
 }
 
+/// A struct to handle navigating a stream
+/// of tokens.
 pub struct Cursor {
     lexer: Box<dyn Tokenize>,
     current: Option<Token>,

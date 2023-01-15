@@ -1,10 +1,7 @@
 use clap::Parser as ArgParser;
 
-mod compiler;
-
 use lexer;
-
-use crate::compiler::Compiler;
+use parser;
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -19,13 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // build a scanner
-    let _lexer = lexer::Lexer::from_path(&args.input)?;
-
     let lexer = lexer::Lexer::from_path(&args.input)?;
-    let mut compiler = Compiler::new(Box::new(lexer));
+    let mut parser = parser::Parser::new(Box::new(lexer));
 
-    let obj_fn = compiler.compile();
-    println!("obj_fn: {:?}", obj_fn);
+    let ast = parser.parse();
+    println!("ast: {:?}", ast);
 
     Ok(())
 }

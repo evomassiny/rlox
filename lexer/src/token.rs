@@ -1,3 +1,11 @@
+use super::source::Span;
+
+#[derive(Debug, PartialEq)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
 /// All Token variants accepted by the scanner
 #[derive(Debug, PartialEq)]
 pub enum TokenKind {

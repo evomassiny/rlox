@@ -1,9 +1,6 @@
-use super::compile_unit::{CompileUnit, ObjFunction};
+use super::ast::{Expr, ExprKind, Stmt, StmtKind};
 use super::cursor::{Cursor, ParseError};
-/// rlox is a single pass compiler,
-/// eg: the parsing and compiling are done in one go.
-/// The `Compiler`struct does both.
-use lexer::{TokenKind, Tokenize};
+use lexer::{Span, TokenKind, Tokenize};
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.
@@ -33,23 +30,32 @@ pub enum Precedence {
     Primary = 10,
 }
 
-pub struct Handler {
-    prefix: Option<fn(&mut Compiler, bool) -> Result<(), ParseError>>,
-    infix: Option<fn(&mut Compiler, bool) -> Result<(), ParseError>>,
+/// What to do when encountering a given TokenKind
+pub struct ParseRule {
+    /// if we are at the start of an expression / stmt
+    prefix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
+    /// if we are in the middle of parsion an expression
+    infix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
+    /// the "binding" power of the TokenKind
     precedence: Precedence,
 }
 
-pub struct Compiler {
+/// Implements a Pratt parser,
+/// using a table of parsing rules
+/// (see `Self::get_parsing_rule_for_token()`)
+pub struct Parser {
     cursor: Cursor,
-    compile_units: Vec<CompileUnit>,
+    stmt_stack: Vec<Stmt>,
+    expr_stack: Vec<Expr>,
 }
 
-impl Compiler {
+impl Parser {
     pub fn new(lexer: Box<dyn Tokenize>) -> Self {
         let cursor = Cursor::new(lexer);
         Self {
             cursor,
-            compile_units: Vec::new(),
+            stmt_stack: Vec::new(),
+            expr_stack: Vec::new(),
         }
     }
 
@@ -103,199 +109,199 @@ impl Compiler {
     /// which parsing routine we should use to parse the
     /// expression, depending if we found the token
     /// in the middle an expression parsion, of a the start.
-    fn get_parsing_rule_for_token(kind: &TokenKind) -> &'static Handler {
+    fn get_parsing_rule_for_token(kind: &TokenKind) -> &'static ParseRule {
         match kind {
-            &TokenKind::LeftParen => &Handler {
+            &TokenKind::LeftParen => &ParseRule {
                 prefix: Some(Self::grouping),
                 infix: None,
                 precedence: Precedence::Call,
             },
-            &TokenKind::RightParen => &Handler {
+            &TokenKind::RightParen => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::LeftBrace => &Handler {
+            &TokenKind::LeftBrace => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::RightBrace => &Handler {
+            &TokenKind::RightBrace => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Comma => &Handler {
+            &TokenKind::Comma => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Dot => &Handler {
+            &TokenKind::Dot => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Minus => &Handler {
+            &TokenKind::Minus => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Plus => &Handler {
+            &TokenKind::Plus => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Semicolon => &Handler {
+            &TokenKind::Semicolon => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Slash => &Handler {
+            &TokenKind::Slash => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Star => &Handler {
+            &TokenKind::Star => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Bang => &Handler {
+            &TokenKind::Bang => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::BangEqual => &Handler {
+            &TokenKind::BangEqual => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Equal => &Handler {
+            &TokenKind::Equal => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::EqualEqual => &Handler {
+            &TokenKind::EqualEqual => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Greater => &Handler {
+            &TokenKind::Greater => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::GreaterEqual => &Handler {
+            &TokenKind::GreaterEqual => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Less => &Handler {
+            &TokenKind::Less => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::LessEqual => &Handler {
+            &TokenKind::LessEqual => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Identifier(_) => &Handler {
+            &TokenKind::Identifier(_) => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Str(_) => &Handler {
+            &TokenKind::Str(_) => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Number(_) => &Handler {
+            &TokenKind::Number(_) => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::And => &Handler {
+            &TokenKind::And => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Class => &Handler {
+            &TokenKind::Class => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Else => &Handler {
+            &TokenKind::Else => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::False => &Handler {
+            &TokenKind::False => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Fun => &Handler {
+            &TokenKind::Fun => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::For => &Handler {
+            &TokenKind::For => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::If => &Handler {
+            &TokenKind::If => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Nil => &Handler {
+            &TokenKind::Nil => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Or => &Handler {
+            &TokenKind::Or => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Print => &Handler {
+            &TokenKind::Print => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Return => &Handler {
+            &TokenKind::Return => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Super => &Handler {
+            &TokenKind::Super => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::This => &Handler {
+            &TokenKind::This => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::True => &Handler {
+            &TokenKind::True => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Var => &Handler {
+            &TokenKind::Var => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::While => &Handler {
+            &TokenKind::While => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
             },
-            &TokenKind::Eof => &Handler {
+            &TokenKind::Eof => &ParseRule {
                 prefix: None,
                 infix: None,
                 precedence: Precedence::None,
@@ -303,7 +309,7 @@ impl Compiler {
         }
     }
 
-    pub fn parse_precedence(&mut self, precedence: Precedence) -> Result<(), ParseError> {
+    fn parse_precedence(&mut self, precedence: Precedence) -> Result<(), ParseError> {
         self.cursor.advance()?;
         let mut rule = Self::get_parsing_rule_for_token(&self.cursor.current()?.kind);
         let can_assign: bool = precedence < Precedence::Assignement;
@@ -329,9 +335,10 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn compile(&mut self) -> Result<ObjFunction, ParseError> {
+    /// Parse source into statements
+    pub fn parse(&mut self) -> Result<(), ParseError> {
         self.cursor.advance()?;
-        self.compile_units.push(CompileUnit::new_script());
+        // self.stmt_stack.push([> TODO <]);
 
         while !self.cursor.matches(TokenKind::Eof)? {
             // parse declaration, forward
@@ -343,10 +350,6 @@ impl Compiler {
             }
         }
 
-        let unit = self
-            .compile_units
-            .pop()
-            .ok_or(ParseError::CompilationError)?;
-        Ok(unit.function)
+        Ok(())
     }
 }
