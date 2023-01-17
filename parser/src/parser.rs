@@ -31,6 +31,10 @@ pub enum Precedence {
 }
 
 /// Expression parser
+/// Implements a Pratt parser,
+/// using 2 tables of parsing rules
+/// * one for infix expression
+/// * one for prefix expression
 pub struct ExprParser<'a>(&'a mut Cursor);
 
 /// a function that parses an expression from a cursor, given a prefix TokenKind
@@ -115,9 +119,8 @@ impl<'a> ExprParser<'a> {
     }
 }
 
-/// Implements a Pratt parser,
-/// using a table of parsing rules
-/// (see `ParseRule::get_parsing_rule_for_token()`)
+/// Parse statements using an explicit recursive
+/// descent parser, and expressions using a Pratt Parser.
 pub struct Parser {
     cursor: Cursor,
     stmt_stack: Vec<Stmt>,
