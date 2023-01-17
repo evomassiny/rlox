@@ -30,23 +30,97 @@ pub enum Precedence {
     Primary = 10,
 }
 
-/// What to do when encountering a given TokenKind
-pub struct ParseRule {
-    /// if we are at the start of an expression / stmt
-    prefix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
-    /// if we are in the middle of parsion an expression
-    infix: Option<fn(&mut Parser, bool) -> Result<(), ParseError>>,
-    /// the "binding" power of the TokenKind
-    precedence: Precedence,
+/// Expression parser
+pub struct ExprParser<'a>(&'a mut Cursor);
+
+/// a function that parses an expression from a cursor, given a prefix TokenKind
+type PrefixParserFn = fn(&mut Cursor, bool) -> Result<Expr, ParseError>;
+
+/// a function that parses an expression from a cursor and the previously parsed
+/// expression, given an infix TokenKind
+type InfixParserFn = fn(&mut Cursor, Expr, bool) -> Result<Expr, ParseError>;
+
+impl<'a> ExprParser<'a> {
+    pub fn parse(&mut self) -> Result<Expr, ParseError> {
+        self.parse_precendence(Precedence::Assignement)
+    }
+
+    fn parse_precendence(&mut self, precedence: Precedence) -> Result<Expr, ParseError> {
+        let (prefix_fn, prefix_expr_precedence) = Self::get_prefix_handler(&self.0.current()?.kind)
+            .ok_or(ParseError::ExpectedExpression)?;
+        let can_assign = precedence <= Precedence::Assignement;
+
+        let mut expr = prefix_fn(&mut self.0, can_assign)?;
+
+        while precedence <= prefix_expr_precedence {
+            self.0.advance()?;
+            // call the rule associated with handling
+            // expressing **CONTAINING** this token
+            let infix_fn = Self::get_infix_handler(&self.0.previous()?.kind)
+                .ok_or(ParseError::ExpectedExpression)?;
+            expr = infix_fn(self.0, expr, can_assign)?;
+        }
+        if can_assign && self.0.matches(TokenKind::Equal)? {
+            return Err(ParseError::ExpectedToken(
+                "Invalid assignement target.".into(),
+            ));
+        }
+        Ok(expr)
+    }
+
+    fn grouping(cursor: &mut Cursor, can_assign: bool) -> Result<Expr, ParseError> {
+        todo!();
+    }
+
+    /// Return, depending of the variant of `kind`
+    /// which parsing routine we should use to parse the
+    /// expression
+    fn get_prefix_handler(kind: &TokenKind) -> Option<(PrefixParserFn, Precedence)> {
+        match kind {
+            &TokenKind::LeftParen => Some((Self::grouping, Precedence::Call)),
+            &TokenKind::Minus => todo!(),
+            &TokenKind::Bang => todo!(),
+            &TokenKind::Identifier(_) => todo!(),
+            &TokenKind::Str(_) => todo!(),
+            &TokenKind::Number(_) => todo!(),
+            &TokenKind::False => todo!(),
+            &TokenKind::Nil => todo!(),
+            &TokenKind::Super => todo!(),
+            &TokenKind::This => todo!(),
+            &TokenKind::True => todo!(),
+            _ => None,
+        }
+    }
+
+    /// Return, depending of the variant of `kind`
+    /// which parsing routine we should use to parse the
+    /// expression if we found the token while parsing a bigger expression
+    fn get_infix_handler(kind: &TokenKind) -> Option<InfixParserFn> {
+        match kind {
+            &TokenKind::LeftParen => todo!(),
+            &TokenKind::Dot => todo!(),
+            &TokenKind::Minus => todo!(),
+            &TokenKind::Plus => todo!(),
+            &TokenKind::Slash => todo!(),
+            &TokenKind::BangEqual => todo!(),
+            &TokenKind::EqualEqual => todo!(),
+            &TokenKind::Greater => todo!(),
+            &TokenKind::GreaterEqual => todo!(),
+            &TokenKind::Less => todo!(),
+            &TokenKind::LessEqual => todo!(),
+            &TokenKind::And => todo!(),
+            &TokenKind::Or => todo!(),
+            _ => None,
+        }
+    }
 }
 
 /// Implements a Pratt parser,
 /// using a table of parsing rules
-/// (see `Self::get_parsing_rule_for_token()`)
+/// (see `ParseRule::get_parsing_rule_for_token()`)
 pub struct Parser {
     cursor: Cursor,
     stmt_stack: Vec<Stmt>,
-    expr_stack: Vec<Expr>,
 }
 
 impl Parser {
@@ -55,7 +129,6 @@ impl Parser {
         Self {
             cursor,
             stmt_stack: Vec::new(),
-            expr_stack: Vec::new(),
         }
     }
 
@@ -66,272 +139,109 @@ impl Parser {
      *                | statement;
      */
     fn declaration(&mut self) -> Result<(), ParseError> {
-        if self.cursor.matches(TokenKind::Class)? {
-            self.class_declaration()?;
-        } else if self.cursor.matches(TokenKind::Var)? {
-            self.var_declaration()?;
-        } else if self.cursor.matches(TokenKind::Fun)? {
-            self.fun_declaration()?;
-        } else {
-            self.statement()?;
+        let current: &TokenKind = &self.cursor.current()?.kind;
+        match *current {
+            TokenKind::Class => {
+                self.cursor.advance();
+                self.class_declaration()?;
+            }
+            TokenKind::Var => {
+                self.cursor.advance();
+                self.var_declaration()?;
+            }
+            TokenKind::Fun => {
+                self.cursor.advance();
+                self.fun_declaration()?;
+            }
+            _ => {
+                self.statement();
+            }
         }
         Ok(())
     }
 
     fn class_declaration(&mut self) -> Result<(), ParseError> {
-        Ok(())
+        todo!()
     }
 
     fn fun_declaration(&mut self) -> Result<(), ParseError> {
-        Ok(())
+        todo!()
     }
 
     fn var_declaration(&mut self) -> Result<(), ParseError> {
-        Ok(())
+        todo!()
     }
 
+    fn block_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn if_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn return_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn while_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn for_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn expression_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+    fn print_statement(&mut self) -> Result<(), ParseError> {
+        todo!()
+    }
+
+    /**
+     * statement -> printStatement
+     *              | blockStatement
+     *              | ifStatement
+     *              | returnStatement
+     *              | whileStatement
+     *              | forStatement
+     *              | expressionStatement
+     *              ;
+     */
     fn statement(&mut self) -> Result<(), ParseError> {
+        let current: &TokenKind = &self.cursor.current()?.kind;
+        match *current {
+            TokenKind::Print => {
+                self.cursor.advance();
+                self.print_statement()?;
+            }
+            TokenKind::LeftBrace => {
+                self.cursor.advance();
+                self.block_statement()?;
+            }
+            TokenKind::If => {
+                self.cursor.advance();
+                self.if_statement()?;
+            }
+            TokenKind::Return => {
+                self.cursor.advance();
+                self.return_statement()?;
+            }
+            TokenKind::While => {
+                self.cursor.advance();
+                self.while_statement()?;
+            }
+            TokenKind::For => {
+                self.cursor.advance();
+                self.for_statement()?;
+            }
+            _ => {
+                self.expression_statement();
+            }
+        }
         Ok(())
     }
 
     /// Parse an expression
     fn expression(&mut self, _can_assign: bool) -> Result<(), ParseError> {
-        Ok(())
-    }
-
-    fn grouping(&mut self, can_assign: bool) -> Result<(), ParseError> {
-        self.expression(can_assign)?;
-        self.cursor
-            .consume(TokenKind::RightParen, "Expecting closing parenthesis.")
-    }
-
-    /// Return, depending of the variant of `kind`
-    /// which parsing routine we should use to parse the
-    /// expression, depending if we found the token
-    /// in the middle an expression parsion, of a the start.
-    fn get_parsing_rule_for_token(kind: &TokenKind) -> &'static ParseRule {
-        match kind {
-            &TokenKind::LeftParen => &ParseRule {
-                prefix: Some(Self::grouping),
-                infix: None,
-                precedence: Precedence::Call,
-            },
-            &TokenKind::RightParen => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::LeftBrace => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::RightBrace => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Comma => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Dot => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Minus => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Plus => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Semicolon => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Slash => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Star => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Bang => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::BangEqual => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Equal => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::EqualEqual => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Greater => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::GreaterEqual => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Less => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::LessEqual => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Identifier(_) => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Str(_) => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Number(_) => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::And => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Class => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Else => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::False => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Fun => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::For => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::If => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Nil => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Or => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Print => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Return => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Super => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::This => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::True => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Var => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::While => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-            &TokenKind::Eof => &ParseRule {
-                prefix: None,
-                infix: None,
-                precedence: Precedence::None,
-            },
-        }
-    }
-
-    fn parse_precedence(&mut self, precedence: Precedence) -> Result<(), ParseError> {
-        self.cursor.advance()?;
-        let mut rule = Self::get_parsing_rule_for_token(&self.cursor.current()?.kind);
-        let can_assign: bool = precedence < Precedence::Assignement;
-
-        // call the rule associated with handling
-        // expressing **STARTING** with this token
-        let prefix_fn = rule.prefix.ok_or(ParseError::ExpectedExpression)?;
-        prefix_fn(self, can_assign)?;
-
-        while precedence <= rule.precedence {
-            self.cursor.advance()?;
-            // call the rule associated with handling
-            // expressing **CONTAINING** this token
-            rule = Self::get_parsing_rule_for_token(&self.cursor.previous()?.kind);
-            let infix_fn = rule.infix.ok_or(ParseError::ExpectedExpression)?;
-            infix_fn(self, can_assign)?;
-        }
-        if can_assign && self.cursor.matches(TokenKind::Equal)? {
-            return Err(ParseError::ExpectedToken(
-                "Invalid assignement target.".into(),
-            ));
-        }
+        let mut expression_parser = ExprParser(&mut self.cursor);
+        let expr = expression_parser.parse()?;
         Ok(())
     }
 
