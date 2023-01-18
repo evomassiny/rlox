@@ -1,13 +1,13 @@
 use super::source::Span;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
 }
 
 /// All Token variants accepted by the scanner
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     // Single-character tokens
     LeftParen,

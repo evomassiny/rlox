@@ -27,7 +27,7 @@ pub trait PeekOffset {
 
 /// Struct that represents a position of a `char`
 /// in the input source code.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Span {
     pub line: usize,
     pub column: usize,

@@ -8,3 +8,4 @@ mod token;
 pub use crate::lexer::{Lexer, LexerError, Tokenize};
 pub use crate::source::{PeekOffset, Span};
 pub use crate::token::{TokenKind, Token};
+pub use crate::str_reader::StrPeeker;

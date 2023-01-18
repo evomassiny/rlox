@@ -2,13 +2,15 @@ use lexer::{Span, Token, TokenKind};
 
 /// A Statement
 /// (source that don't evaluate to a value)
+#[derive(Debug, PartialEq)]
 pub struct Stmt {
     /// All statement variants
-    kind: StmtKind,
+    pub kind: StmtKind,
     /// position in source string
-    span: Span,
+    pub span: Span,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum StmtKind {
     /// List of inner statements
     Block(Vec<Stmt>),
@@ -29,19 +31,21 @@ pub enum StmtKind {
 
 /// an Expression
 /// (source that evaluates to a value)
+#[derive(Debug, PartialEq)]
 pub struct Expr {
     /// All Expression variants
-    kind: ExprKind,
+    pub kind: ExprKind,
     /// position in source string
-    span: Span,
+    pub span: Span,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ExprKind {
     Literal(LiteralKind),
     /// operator, expression
     Unary(Token, Box<Expr>),
     /// left, operand, right
-    Binary(Box<Expr>, Token, Box<Expr>),
+    Binary(Box<Expr>, TokenKind, Box<Expr>),
     /// wrapped expression
     Grouping(Box<Expr>),
     /// callee, parenthesis, Args
@@ -60,6 +64,7 @@ pub enum ExprKind {
     Variable(Token),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum LiteralKind {
     Num(f64),
     Str(String),

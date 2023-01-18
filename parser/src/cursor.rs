@@ -34,6 +34,15 @@ impl Cursor {
         Ok(())
     }
 
+    /// get ownership of the current token
+    pub fn take_current(&mut self) -> Result<Token, ParseError> {
+        self.current.take().ok_or(ParseError::Starved)
+    }
+    /// get ownership of the previous token
+    pub fn take_previous(&mut self) -> Result<Token, ParseError> {
+        self.previous.take().ok_or(ParseError::Starved)
+    }
+
     /// The current token
     pub fn current<'a>(&'a self) -> Result<&'a Token, ParseError> {
         self.current.as_ref().ok_or(ParseError::Starved)

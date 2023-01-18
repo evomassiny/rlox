@@ -84,7 +84,6 @@ impl<T: PeekOffset> Lexer<T> {
             if c.is_whitespace() {
                 break;
             }
-            identifier.push(c);
             if !c.is_ascii_digit() {
                 if c == '.' {
                     while let Some(cc) = self.input.peek(identifier.len() - 1) {
@@ -93,13 +92,12 @@ impl<T: PeekOffset> Lexer<T> {
                         }
                         identifier.push(cc);
                     }
-                    break;
-                } else {
-                    return None;
-                }
+                } 
+                break;
             }
+            identifier.push(c);
         }
-        for _ in 0..identifier.len() {
+        for _ in 0..(identifier.len() - 1) {
             self.input.advance();
         }
         Some(Token {
