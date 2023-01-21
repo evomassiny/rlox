@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let lexer = lexer::Lexer::from_path(&args.input)?;
-    let mut parser = parser::Parser::new(Box::new(lexer));
+    let mut parser = parser::StmtParser::new(Box::new(lexer));
 
     let ast = parser.parse();
     println!("ast: {:?}", ast);

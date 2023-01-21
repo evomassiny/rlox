@@ -6,7 +6,6 @@ pub enum ParseError {
     ScanningError(LexerError),
     ExpectedExpression,
     Starved,
-    CompilationError,
 }
 
 /// A struct to handle navigating a stream
@@ -44,12 +43,12 @@ impl Cursor {
     }
 
     /// The current token
-    pub fn current<'a>(&'a self) -> Result<&'a Token, ParseError> {
+    pub fn current<'b>(&'b self) -> Result<&'b Token, ParseError> {
         self.current.as_ref().ok_or(ParseError::Starved)
     }
 
     /// The last token we parsed
-    pub fn previous<'a>(&'a self) -> Result<&'a Token, ParseError> {
+    pub fn previous<'b>(&'b self) -> Result<&'b Token, ParseError> {
         self.previous.as_ref().ok_or(ParseError::Starved)
     }
 
