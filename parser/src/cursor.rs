@@ -10,14 +10,14 @@ pub enum ParseError {
 
 /// A struct to handle navigating a stream
 /// of tokens.
-pub struct Cursor {
-    lexer: Box<dyn Tokenize>,
+pub struct Cursor<'input> {
+    lexer: Box<dyn Tokenize + 'input>,
     current: Option<Token>,
     previous: Option<Token>,
 }
 
-impl Cursor {
-    pub fn new(lexer: Box<dyn Tokenize>) -> Self {
+impl<'input> Cursor<'input> {
+    pub fn new(lexer: Box<dyn Tokenize + 'input>) -> Self {
         Self {
             lexer,
             current: None,
@@ -43,12 +43,18 @@ impl Cursor {
     }
 
     /// The current token
-    pub fn current<'b>(&'b self) -> Result<&'b Token, ParseError> {
+    pub fn current<'token>(&'input self) -> Result<&'token Token, ParseError>
+    where
+        'input: 'token,
+    {
         self.current.as_ref().ok_or(ParseError::Starved)
     }
 
     /// The last token we parsed
-    pub fn previous<'b>(&'b self) -> Result<&'b Token, ParseError> {
+    pub fn previous<'token>(&'input self) -> Result<&'token Token, ParseError>
+    where
+        'input: 'token,
+    {
         self.previous.as_ref().ok_or(ParseError::Starved)
     }
 

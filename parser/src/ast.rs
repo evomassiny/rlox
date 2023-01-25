@@ -45,7 +45,7 @@ pub enum ExprKind {
     /// operator, expression
     Unary(Token, Box<Expr>),
     /// left, operand, right
-    Binary(Box<Expr>, TokenKind, Box<Expr>),
+    Binary(Box<Expr>, BinaryExprKind, Box<Expr>),
     /// wrapped expression
     Grouping(Box<Expr>),
     /// callee, parenthesis, Args
@@ -70,4 +70,12 @@ pub enum LiteralKind {
     Str(String),
     Bool(bool),
     Nil,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinaryExprKind {
+    Add,
+    Sub,
+    Div,
+    Mul,
 }

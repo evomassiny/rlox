@@ -1,7 +1,7 @@
 use super::file_reader::ReaderPeeker;
 use super::source::{PeekOffset, SourceInput, Span};
 use super::str_reader::StrPeeker;
-use super::token::{TokenKind, Token};
+use super::token::{Token, TokenKind};
 use std::fs::File;
 
 use std::path::Path;
@@ -92,7 +92,7 @@ impl<T: PeekOffset> Lexer<T> {
                         }
                         identifier.push(cc);
                     }
-                } 
+                }
                 break;
             }
             identifier.push(c);

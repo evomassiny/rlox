@@ -1,4 +1,4 @@
-use super::ast::{Expr, ExprKind, LiteralKind};
+use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind};
 use super::cursor::{Cursor, ParseError};
 use lexer::{Span, Token, TokenKind, Tokenize};
 
@@ -34,7 +34,7 @@ pub enum Precedence {
 /// using 2 tables of parsing rules
 /// * one for infix expression
 /// * one for prefix expression
-pub struct ExprParser<'a>(&'a mut Cursor);
+pub struct ExprParser<'cursor, 'input>(&'cursor mut Cursor<'input>);
 
 /// a function that parses an expression from a cursor, given a prefix TokenKind
 type PrefixParserFn = fn(&mut Cursor, bool) -> Result<Expr, ParseError>;
@@ -43,8 +43,11 @@ type PrefixParserFn = fn(&mut Cursor, bool) -> Result<Expr, ParseError>;
 /// expression, given an infix TokenKind
 type InfixParserFn = fn(&mut Cursor, Expr, bool) -> Result<Expr, ParseError>;
 
-impl<'a> ExprParser<'a> {
-    pub fn new(cursor: &'a mut Cursor) -> Self {
+impl<'cursor, 'input> ExprParser<'cursor, 'input>
+where
+    'input: 'cursor,
+{
+    pub fn new(cursor: &'cursor mut Cursor<'input>) -> Self {
         Self(cursor)
     }
 
@@ -67,7 +70,6 @@ impl<'a> ExprParser<'a> {
             if next_expr_precedence <= precedence {
                 break;
             }
-            dbg!("HERE");
             let _ = cursor.advance();
             // call the rule associated with handling
             // expressing **CONTAINING** this token
@@ -88,7 +90,7 @@ impl<'a> ExprParser<'a> {
     /// expression
     fn get_prefix_handler(kind: &TokenKind) -> Option<PrefixParserFn> {
         match kind {
-            &TokenKind::LeftParen => todo!(),
+            &TokenKind::LeftParen => Some(Self::parse_grouping),
             &TokenKind::Minus => todo!(),
             &TokenKind::Bang => todo!(),
             &TokenKind::Identifier(_) => todo!(),
@@ -120,9 +122,9 @@ impl<'a> ExprParser<'a> {
         match kind {
             &TokenKind::LeftParen => todo!(),
             &TokenKind::Dot => todo!(),
-            &TokenKind::Minus => todo!(),
+            &TokenKind::Minus => Some(Self::parse_substraction),
             &TokenKind::Plus => Some(Self::parse_sum),
-            &TokenKind::Slash => todo!(),
+            &TokenKind::Slash => Some(Self::parse_division),
             &TokenKind::Star => Some(Self::parse_product),
             &TokenKind::BangEqual => todo!(),
             &TokenKind::EqualEqual => todo!(),
@@ -137,7 +139,19 @@ impl<'a> ExprParser<'a> {
     }
 
     fn parse_grouping(cursor: &mut Cursor, can_assign: bool) -> Result<Expr, ParseError> {
-        todo!();
+        let Token { kind: TokenKind::LeftParen, span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected '('.".to_string()));
+        };
+        let inner_expression = Self::parse_precedence(cursor, Precedence::Assignement)?;
+        let _ = cursor.advance()?;
+        let Token { kind: TokenKind::RightParen, .. } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected ')'.".to_string()));
+        };
+
+        Ok(Expr {
+            kind: ExprKind::Grouping(Box::new(inner_expression)),
+            span,
+        })
     }
 
     /// Build a Literal expression from a Number Token.
@@ -151,39 +165,61 @@ impl<'a> ExprParser<'a> {
         })
     }
 
-    /// Build a sum,
-    /// (assumes a '+' or '-' token has just been parse)
-    fn parse_sum(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
-        // rhs => right hand side
-        // lhs => left hand side
-        let Token { kind, span } = cursor.take_previous()?;
-        let rhs = Self::parse_precedence(cursor, Precedence::Factor)?;
+    fn parse_binary_expression(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        rhs_precendence: Precedence,
+        binary_kind: BinaryExprKind,
+    ) -> Result<Expr, ParseError> {
+        let Token { span, .. } = cursor.take_previous()?;
+        let rhs = Self::parse_precedence(cursor, rhs_precendence)?;
         Ok(Expr {
-            kind: ExprKind::Binary(Box::new(lhs), kind, Box::new(rhs)),
+            kind: ExprKind::Binary(Box::new(lhs), binary_kind, Box::new(rhs)),
             span,
         })
     }
 
+    /// Build a sum,
+    /// (assumes a '+' token has just been parsed)
+    fn parse_sum(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Factor, BinaryExprKind::Add)
+    }
+
+    /// Build a substraction,
+    /// (assumes a '-' token has just been parsed)
+    fn parse_substraction(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Factor, BinaryExprKind::Sub)
+    }
+
     /// Build a product,
-    /// (assumes a '*' or '/' token has just been parse)
+    /// (assumes a '*' token has just been parsed)
     fn parse_product(
         cursor: &mut Cursor,
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        let Token { kind, span } = cursor.take_previous()?;
-        let rhs = Self::parse_precedence(cursor, Precedence::Unary)?;
-        Ok(Expr {
-            kind: ExprKind::Binary(Box::new(lhs), kind, Box::new(rhs)),
-            span,
-        })
+        Self::parse_binary_expression(cursor, lhs, Precedence::Unary, BinaryExprKind::Mul)
+    }
+
+    /// Build a division,
+    /// (assumes a '/' token has just been parsed)
+    fn parse_division(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Unary, BinaryExprKind::Div)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::ExprParser;
-    use crate::ast::{Expr, ExprKind, LiteralKind};
+    use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind};
     use crate::cursor::{Cursor, ParseError};
     use lexer::{Lexer, StrPeeker, TokenKind, Tokenize};
 
@@ -200,6 +236,19 @@ mod tests {
     }
 
     #[test]
+    fn parse_group() {
+        let src = "(1)";
+        let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
+        let mut cursor = Cursor::new(Box::new(lexer));
+        let _ = cursor.advance();
+        let mut parser = ExprParser::new(&mut cursor);
+
+        let expr = parser.parse().unwrap();
+        let ExprKind::Grouping(inner_expr) = expr.kind else { panic!("failed to parse group") };
+        assert_eq!(inner_expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+    }
+
+    #[test]
     fn parse_sum() {
         let src = "1 + 2";
         let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
@@ -211,7 +260,22 @@ mod tests {
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
-        assert_eq!(token_kind, TokenKind::Plus);
+        assert_eq!(token_kind, BinaryExprKind::Add);
+    }
+
+    #[test]
+    fn parse_substraction() {
+        let src = "1 - 2";
+        let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
+        let mut cursor = Cursor::new(Box::new(lexer));
+        let _ = cursor.advance();
+        let mut parser = ExprParser::new(&mut cursor);
+
+        let expr = parser.parse().unwrap();
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::Sub);
     }
 
     #[test]
@@ -226,7 +290,22 @@ mod tests {
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse product") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
-        assert_eq!(token_kind, TokenKind::Star);
+        assert_eq!(token_kind, BinaryExprKind::Mul);
+    }
+
+    #[test]
+    fn parse_division() {
+        let src = "1 / 2";
+        let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
+        let mut cursor = Cursor::new(Box::new(lexer));
+        let _ = cursor.advance();
+        let mut parser = ExprParser::new(&mut cursor);
+
+        let expr = parser.parse().unwrap();
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse division") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::Div);
     }
 
     #[test]
@@ -239,13 +318,13 @@ mod tests {
 
         let expr = parser.parse().unwrap();
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
-        assert_eq!(token_kind, TokenKind::Plus);
+        assert_eq!(token_kind, BinaryExprKind::Add);
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(3.)));
-        assert_eq!(token_kind, TokenKind::Plus);
+        assert_eq!(token_kind, BinaryExprKind::Add);
 
         let ExprKind::Binary(lhs, token_kind, rhs) = lhs.kind else { panic!("failed to parse product") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
-        assert_eq!(token_kind, TokenKind::Star);
+        assert_eq!(token_kind, BinaryExprKind::Mul);
     }
 }

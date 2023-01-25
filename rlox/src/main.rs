@@ -3,7 +3,7 @@ use clap::Parser as ArgParser;
 use lexer;
 use parser;
 
-use lexer::{TokenKind,Tokenize};
+use lexer::{TokenKind, Tokenize};
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -21,7 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lexer = lexer::Lexer::from_path(&args.input)?;
     while let Ok(t) = lexer.scan_next() {
         println!("token: {:?}", &t);
-        if matches!(t.kind, TokenKind::Eof) { break ; };
+        if matches!(t.kind, TokenKind::Eof) {
+            break;
+        };
     }
 
     let lexer = lexer::Lexer::from_path(&args.input)?;
