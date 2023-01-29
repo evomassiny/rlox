@@ -43,7 +43,7 @@ pub struct Expr {
 pub enum ExprKind {
     Literal(LiteralKind),
     /// operator, expression
-    Unary(Token, Box<Expr>),
+    Unary(UnaryExprKind, Box<Expr>),
     /// left, operand, right
     Binary(Box<Expr>, BinaryExprKind, Box<Expr>),
     /// wrapped expression
@@ -78,4 +78,10 @@ pub enum BinaryExprKind {
     Sub,
     Div,
     Mul,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryExprKind {
+    Not,
+    Minus,
 }
