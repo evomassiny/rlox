@@ -59,13 +59,14 @@ impl<T: PeekOffset> Lexer<T> {
         identifier.push(c);
         let span = self.input.span();
         while let Some(c) = self.input.peek(identifier.len() - 1) {
-            if !c.is_ascii_alphanumeric() {
+            if !c.is_ascii_alphanumeric() && c != '_' {
                 break;
             }
             identifier.push(c);
         }
-        for _ in 0..identifier.len() {
-            self.input.advance();
+        for _ in 0..(identifier.len() - 1) {
+            let c = self.input.advance();
+            dbg!(c);
         }
         Some(Token {
             kind: TokenKind::parse_string(identifier),
@@ -154,6 +155,7 @@ impl<T: PeekOffset> Tokenize for Lexer<T> {
         if let Some(token) = self.try_parse_number(c) {
             return Ok(token);
         }
+        dbg!(&c);
         match c {
             '(' => Ok(Token {
                 kind: TokenKind::LeftParen,
@@ -538,6 +540,22 @@ fn should_parse_number_tokens() {
 }
 
 #[test]
+fn should_parse_dot() {
+    type StrLexer<'a> = Lexer<StrPeeker<'a, 64>>;
+    assert_eq!(
+        StrLexer::from_str(".").scan_next(),
+        Ok(Token {
+            kind: TokenKind::Dot,
+            span: Span {
+                line: 1,
+                column: 1,
+                char_index: 0
+            }
+        })
+    );
+}
+
+#[test]
 fn should_parse_identifier_tokens() {
     type StrLexer<'a> = Lexer<StrPeeker<'a, 64>>;
     assert_eq!(
@@ -556,6 +574,18 @@ fn should_parse_identifier_tokens() {
         StrLexer::from_str("a0 ").scan_next(),
         Ok(Token {
             kind: TokenKind::Identifier("a0".to_string()),
+            span: Span {
+                line: 1,
+                column: 1,
+                char_index: 0
+            }
+        })
+    );
+    // test with underscore
+    assert_eq!(
+        StrLexer::from_str("a_a").scan_next(),
+        Ok(Token {
+            kind: TokenKind::Identifier("a_a".to_string()),
             span: Span {
                 line: 1,
                 column: 1,
@@ -741,6 +771,83 @@ fn should_parse_keyword_tokens() {
                 line: 1,
                 column: 1,
                 char_index: 0
+            }
+        })
+    );
+}
+
+#[test]
+fn should_parse_sequence() {
+    type StrLexer<'a> = Lexer<StrPeeker<'a, 64>>;
+
+    // test "1+2"
+    let mut lexer = StrLexer::from_str("1+2");
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Number(1.),
+            span: Span {
+                line: 1,
+                column: 1,
+                char_index: 0
+            }
+        })
+    );
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Plus,
+            span: Span {
+                line: 1,
+                column: 2,
+                char_index: 1
+            }
+        })
+    );
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Number(2.),
+            span: Span {
+                line: 1,
+                column: 3,
+                char_index: 2
+            }
+        })
+    );
+
+    // test "super.method_name"
+    let mut lexer = StrLexer::from_str("super.method_name");
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Super,
+            span: Span {
+                line: 1,
+                column: 1,
+                char_index: 0
+            }
+        })
+    );
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Dot,
+            span: Span {
+                line: 1,
+                column: 6,
+                char_index: 5
+            }
+        })
+    );
+    assert_eq!(
+        lexer.scan_next(),
+        Ok(Token {
+            kind: TokenKind::Identifier("method_name".to_string()),
+            span: Span {
+                line: 1,
+                column: 7,
+                char_index: 6
             }
         })
     );

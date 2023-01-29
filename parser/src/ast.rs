@@ -56,12 +56,12 @@ pub enum ExprKind {
     Set(Box<Expr>, Token, Box<Expr>),
     /// left hand side, right hand side
     Assign(Token, Box<Expr>),
-    /// keyword, method
-    Super(Token, Token),
+    /// method
+    Super(String),
     /// keyword
-    This(Token),
+    This,
     /// var name
-    Variable(Token),
+    Variable(String),
 }
 
 #[derive(Debug, PartialEq)]

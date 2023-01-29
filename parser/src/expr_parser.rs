@@ -94,13 +94,13 @@ where
             &TokenKind::LeftParen => Some(Self::parse_grouping),
             &TokenKind::Minus => Some(Self::parse_minus),
             &TokenKind::Bang => Some(Self::parse_not),
-            &TokenKind::Identifier(_) => todo!(),
+            &TokenKind::Identifier(_) => Some(Self::parse_variable),
             &TokenKind::Str(_) => Some(Self::parse_string),
             &TokenKind::Number(_) => Some(Self::parse_number),
             &TokenKind::False => Some(Self::parse_false),
             &TokenKind::Nil => Some(Self::parse_nil),
-            &TokenKind::Super => todo!(),
-            &TokenKind::This => todo!(),
+            &TokenKind::Super => Some(Self::parse_super),
+            &TokenKind::This => Some(Self::parse_this),
             &TokenKind::True => Some(Self::parse_true),
             _ => None,
         }
@@ -236,6 +236,47 @@ where
         })
     }
 
+    /// Build a `Variable` expression from an `Identifier` Token.
+    fn parse_variable(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
+        let Token { kind: TokenKind::Identifier(name), span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected an identifier".to_string()));
+        };
+        Ok(Expr {
+            kind: ExprKind::Variable(name),
+            span,
+        })
+    }
+
+    /// Build a `Super` expression from an [`Super`, `Dot`, `Identifier`] Token sequences.
+    fn parse_super(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
+        let Token { kind: TokenKind::Super, span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected 'super'".to_string()));
+        };
+        let _ = cursor.advance()?;
+        let Token { kind: TokenKind::Dot, span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected '.'".to_string()));
+        };
+        let _ = cursor.advance()?;
+        let Token { kind: TokenKind::Identifier(method_name), span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected a method identifier".to_string()));
+        };
+        Ok(Expr {
+            kind: ExprKind::Super(method_name),
+            span,
+        })
+    }
+
+    /// Build a `This` expression from a `This` token.
+    fn parse_this(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
+        let Token { kind: TokenKind::This, span: this_span } = cursor.take_previous()? else {
+           return Err(ParseError::ExpectedToken("Expected 'this'".to_string()));
+        };
+        Ok(Expr {
+            kind: ExprKind::This,
+            span: this_span,
+        })
+    }
+
     fn parse_binary_expression(
         cursor: &mut Cursor,
         lhs: Expr,
@@ -288,7 +329,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod parsing {
     use super::ExprParser;
     use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, UnaryExprKind};
     use crate::cursor::{Cursor, ParseError};
@@ -338,6 +379,27 @@ mod tests {
         let src = "false";
         let expr = parse_expression(&src).unwrap();
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Bool(false)));
+    }
+
+    #[test]
+    fn parse_variable() {
+        let src = "a";
+        let expr = parse_expression(&src).unwrap();
+        assert_eq!(expr.kind, ExprKind::Variable("a".to_string()));
+    }
+
+    #[test]
+    fn parse_super() {
+        let src = "super.method_name";
+        let expr = parse_expression(&src).unwrap();
+        assert_eq!(expr.kind, ExprKind::Super("method_name".to_string()));
+    }
+
+    #[test]
+    fn parse_this() {
+        let src = "this";
+        let expr = parse_expression(&src).unwrap();
+        assert_eq!(expr.kind, ExprKind::This);
     }
 
     #[test]

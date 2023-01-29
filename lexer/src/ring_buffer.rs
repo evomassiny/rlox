@@ -68,11 +68,6 @@ impl<const SIZE: usize, T: Copy> RingBuffer<SIZE, T> {
         self.length
     }
 
-    /// How many elements are left in the buffer
-    pub fn empty_slots(&self) -> usize {
-        SIZE - self.length
-    }
-
     pub fn capacity(&self) -> usize {
         SIZE
     }
@@ -106,7 +101,7 @@ fn test_ring_push_back_pop_front() {
     let mut buffer: RingBuffer<SIZE, usize> = RingBuffer::init(0);
 
     for i in 0..SIZE {
-        buffer.append(i);
+        let _ = buffer.append(i);
     }
     assert_eq!(buffer.len(), SIZE);
 
@@ -130,7 +125,7 @@ fn test_overfilling() {
     let mut buffer: RingBuffer<SIZE, usize> = RingBuffer::init(0);
 
     for i in 0..SIZE {
-        buffer.append(i);
+        let _ = buffer.append(i);
     }
     assert_eq!(buffer.len(), SIZE);
     assert_eq!(buffer.append(0), Err(BufferFull));
