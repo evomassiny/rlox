@@ -44,12 +44,14 @@ pub enum ExprKind {
     Literal(LiteralKind),
     /// operator, expression
     Unary(UnaryExprKind, Box<Expr>),
-    /// left, operand, right
+    /// left, (+, -, /, *, ==, !=, >=, >, <=, <), right
     Binary(Box<Expr>, BinaryExprKind, Box<Expr>),
+    /// left, ( &&, ||), right
+    Logical(Box<Expr>, LogicalExprKind, Box<Expr>),
     /// wrapped expression
     Grouping(Box<Expr>),
     /// callee, parenthesis, Args
-    Call(Box<Expr>, Token, Vec<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
     /// Object, attribute
     Get(Box<Expr>, Token),
     /// Object, attribute, value
@@ -78,6 +80,18 @@ pub enum BinaryExprKind {
     Sub,
     Div,
     Mul,
+    NotEqual,
+    Equal,
+    LessEqual,
+    Less,
+    GreaterEqual,
+    Greater,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LogicalExprKind {
+    And,
+    Or,
 }
 
 #[derive(Debug, PartialEq)]

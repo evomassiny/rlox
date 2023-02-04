@@ -1,4 +1,4 @@
-use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, UnaryExprKind};
+use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
 use super::cursor::{Cursor, ParseError};
 use lexer::{Span, Token, TokenKind, Tokenize};
 
@@ -112,6 +112,15 @@ where
         match kind {
             &TokenKind::Plus | &TokenKind::Minus => Some(Precedence::Term),
             &TokenKind::Star | &TokenKind::Slash => Some(Precedence::Factor),
+            &TokenKind::EqualEqual
+            | &TokenKind::BangEqual
+            | &TokenKind::GreaterEqual
+            | &TokenKind::Greater
+            | &TokenKind::LessEqual
+            | &TokenKind::Less => Some(Precedence::Comparison),
+            &TokenKind::Or => Some(Precedence::Or),
+            &TokenKind::And => Some(Precedence::And),
+            &TokenKind::LeftParen => Some(Precedence::Call),
             _ => None,
         }
     }
@@ -121,20 +130,20 @@ where
     /// expression if we found the token while parsing a bigger expression
     fn get_infix_handler(kind: &TokenKind) -> Option<InfixParserFn> {
         match kind {
-            &TokenKind::LeftParen => todo!(),
+            &TokenKind::LeftParen => Some(Self::parse_call),
             &TokenKind::Dot => todo!(),
             &TokenKind::Minus => Some(Self::parse_substraction),
             &TokenKind::Plus => Some(Self::parse_sum),
             &TokenKind::Slash => Some(Self::parse_division),
             &TokenKind::Star => Some(Self::parse_product),
-            &TokenKind::BangEqual => todo!(),
-            &TokenKind::EqualEqual => todo!(),
-            &TokenKind::Greater => todo!(),
-            &TokenKind::GreaterEqual => todo!(),
-            &TokenKind::Less => todo!(),
-            &TokenKind::LessEqual => todo!(),
-            &TokenKind::And => todo!(),
-            &TokenKind::Or => todo!(),
+            &TokenKind::BangEqual => Some(Self::parse_not_equal),
+            &TokenKind::EqualEqual => Some(Self::parse_equal),
+            &TokenKind::Greater => Some(Self::parse_greater),
+            &TokenKind::GreaterEqual => Some(Self::parse_greater_equal),
+            &TokenKind::Less => Some(Self::parse_less),
+            &TokenKind::LessEqual => Some(Self::parse_less_equal),
+            &TokenKind::And => Some(Self::parse_and),
+            &TokenKind::Or => Some(Self::parse_or),
             _ => None,
         }
     }
@@ -277,6 +286,28 @@ where
         })
     }
 
+    /// Build a 'call' expression,
+    /// (assumes an '(' token has just been parsed)
+    /// parse all sub expression (the call arguments)
+    fn parse_call(
+        cursor: &mut Cursor,
+        callee: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        let Token { span, .. } = cursor.take_previous()?;
+        let mut arguments: Vec<Expr> = Vec::new();
+        while !matches!(cursor.current()?.kind, TokenKind::RightParen) {
+            arguments.push(Self::parse_precedence(cursor, Precedence::Assignement)?);
+            if matches!(cursor.current()?.kind, TokenKind::Comma) {
+                let _ = cursor.advance()?;
+            }
+        }
+        Ok(Expr {
+            kind: ExprKind::Call(Box::new(callee), arguments),
+            span,
+        })
+    }
+
     fn parse_binary_expression(
         cursor: &mut Cursor,
         lhs: Expr,
@@ -289,6 +320,80 @@ where
             kind: ExprKind::Binary(Box::new(lhs), binary_kind, Box::new(rhs)),
             span,
         })
+    }
+
+    /// Build an 'and' logical expression,
+    /// (assumes an 'and' token has just been parsed)
+    fn parse_and(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+        let Token { span, .. } = cursor.take_previous()?;
+        let rhs = Self::parse_precedence(cursor, Precedence::Equality)?;
+        Ok(Expr {
+            kind: ExprKind::Logical(Box::new(lhs), LogicalExprKind::And, Box::new(rhs)),
+            span,
+        })
+    }
+
+    /// Build an 'or' logical expression,
+    /// (assumes a 'or' token has just been parsed)
+    fn parse_or(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+        let Token { span, .. } = cursor.take_previous()?;
+        let rhs = Self::parse_precedence(cursor, Precedence::And)?;
+        Ok(Expr {
+            kind: ExprKind::Logical(Box::new(lhs), LogicalExprKind::Or, Box::new(rhs)),
+            span,
+        })
+    }
+
+    /// Build a 'not equal' comparison expression,
+    /// (assumes a '!=' token has just been parsed)
+    fn parse_not_equal(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::NotEqual)
+    }
+
+    /// Build an 'equal' comparison expression,
+    /// (assumes a '== token has just been parsed)
+    fn parse_equal(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::Equal)
+    }
+
+    /// Build an 'less or equal' comparison expression,
+    /// (assumes a '<= token has just been parsed)
+    fn parse_less_equal(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::LessEqual)
+    }
+
+    /// Build an 'less' comparison expression,
+    /// (assumes a '<' token has just been parsed)
+    fn parse_less(cursor: &mut Cursor, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::Less)
+    }
+
+    /// Build an 'greater or equal' comparison expression,
+    /// (assumes a '>=' token has just been parsed)
+    fn parse_greater_equal(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::GreaterEqual)
+    }
+
+    /// Build an 'greater' expression,
+    /// (assumes a '> token has just been parsed)
+    fn parse_greater(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        Self::parse_binary_expression(cursor, lhs, Precedence::Term, BinaryExprKind::Greater)
     }
 
     /// Build a sum,
@@ -331,7 +436,7 @@ where
 #[cfg(test)]
 mod parsing {
     use super::ExprParser;
-    use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, UnaryExprKind};
+    use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
     use crate::cursor::{Cursor, ParseError};
     use lexer::{Lexer, StrPeeker, TokenKind, Tokenize};
 
@@ -472,6 +577,127 @@ mod parsing {
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
         assert_eq!(token_kind, BinaryExprKind::Div);
+    }
+
+    #[test]
+    fn parse_not_equal() {
+        let src = "1 != 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::NotEqual);
+    }
+
+    #[test]
+    fn parse_equal() {
+        let src = "1 == 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::Equal);
+    }
+
+    #[test]
+    fn parse_less() {
+        let src = "1 < 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::Less);
+    }
+
+    #[test]
+    fn parse_less_equal() {
+        let src = "1 <= 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::LessEqual);
+    }
+
+    #[test]
+    fn parse_greater() {
+        let src = "1 > 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::Greater);
+    }
+
+    #[test]
+    fn parse_greater_equal() {
+        let src = "1 >= 2";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
+        assert_eq!(token_kind, BinaryExprKind::GreaterEqual);
+    }
+
+    #[test]
+    fn parse_and() {
+        let src = "true and true";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Logical(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse logical expression") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        assert_eq!(token_kind, LogicalExprKind::And);
+    }
+
+    #[test]
+    fn parse_or() {
+        let src = "true or true";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Logical(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse logical expression") };
+        assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        assert_eq!(token_kind, LogicalExprKind::Or);
+    }
+
+    #[test]
+    fn parse_call_no_arg() {
+        // test with no args
+        let src = "fn()";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression") };
+        assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
+        assert_eq!(arguments, vec![]);
+    }
+
+    #[test]
+    fn parse_call_one_arg() {
+        // test with one arg
+        let src = "fn(1)";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression with one arg") };
+        assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
+        assert_eq!(arguments.len(), 1);
+    }
+
+    #[test]
+    fn parse_call_several_args() {
+        // test with two arg
+        let src = "fn(1, 2)";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression with several args") };
+        assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
+        assert_eq!(arguments.len(), 2);
     }
 
     #[test]
