@@ -2,9 +2,9 @@ use lexer::{LexerError, Token, TokenKind, Tokenize};
 
 #[derive(Debug)]
 pub enum ParseError {
-    ExpectedToken(String),
+    ExpectedToken(&'static str),
     ScanningError(LexerError),
-    ExpectedExpression,
+    ExpectedExpression(&'static str),
     Starved,
 }
 
@@ -60,11 +60,12 @@ impl<'input> Cursor<'input> {
 
     /// consume one token from the lexer,
     /// return an error if it doesn't match `kind`
-    pub fn consume(&mut self, _kind: TokenKind, err_msg: &str) -> Result<(), ParseError> {
+    pub fn consume(&mut self, kind: TokenKind, err_msg: &'static str) -> Result<(), ParseError> {
         let token = self.lexer.scan_next().map_err(ParseError::ScanningError)?;
-        if !matches!(token.kind, _kind) {
-            return Err(ParseError::ExpectedToken(err_msg.into()));
+        if !matches!(token.kind, kind) {
+            return Err(ParseError::ExpectedToken(err_msg));
         }
+        let _ = self.advance()?;
         Ok(())
     }
 
@@ -80,7 +81,7 @@ impl<'input> Cursor<'input> {
         if !self.check(kind)? {
             return Ok(false);
         }
-        self.advance()?;
+        let _ = self.advance()?;
         Ok(true)
     }
 

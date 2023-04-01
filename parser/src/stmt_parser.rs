@@ -27,14 +27,11 @@ impl<'input> StmtParser<'input> {
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
         match *current {
+            TokenKind::Var => self.var_declaration(),
             /*
             TokenKind::Class => {
                 self.cursor.advance()?;
                 self.class_declaration()
-            }
-            TokenKind::Var => {
-                self.cursor.advance()?;
-                self.var_declaration()
             }
             TokenKind::Fun => {
                 self.cursor.advance()?;
@@ -45,37 +42,95 @@ impl<'input> StmtParser<'input> {
         }
     }
 
-    fn class_declaration(&'input mut self) -> Result<Stmt, ParseError> {
+    /// parse a var declaration
+    fn var_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
+        // position cursor rigt after `var` token;
+        let _ = self.cursor.advance()?;
+
+        // store span of `var` token
+        let Token { span: var_span, .. } = self.cursor.take_previous()?;
+
+        // parse next expression
+        let mut expression_parser = ExprParser::new(&mut self.cursor);
+        let expr = expression_parser.parse()?;
+        let _ = self
+            .cursor
+            .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
+
+        match expr {
+            // case with no initializer
+            Expr {
+                kind: ExprKind::Variable(id),
+                span,
+            } => {
+                let nil_expr = Expr {
+                    kind: ExprKind::Literal(LiteralKind::Nil),
+                    span,
+                };
+                Ok(Stmt {
+                    kind: StmtKind::Var(id, Box::new(nil_expr)),
+                    span: var_span,
+                })
+            }
+            // case with initializer
+            Expr {
+                kind: ExprKind::Assign(id, initializer),
+                ..
+            } => Ok(Stmt {
+                kind: StmtKind::Var(id, initializer),
+                span: var_span,
+            }),
+            _ => Err(ParseError::ExpectedExpression("Expected variable name.")),
+        }
+    }
+
+    fn class_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
 
-    fn fun_declaration(&'input mut self) -> Result<Stmt, ParseError> {
+    fn fun_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
 
-    fn var_declaration(&'input mut self) -> Result<Stmt, ParseError> {
+    fn block_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
-
-    fn block_statement(&'input mut self) -> Result<Stmt, ParseError> {
+    fn if_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
-    fn if_statement(&'input mut self) -> Result<Stmt, ParseError> {
+    fn return_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
-    fn return_statement(&'input mut self) -> Result<Stmt, ParseError> {
+    fn while_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
-    fn while_statement(&'input mut self) -> Result<Stmt, ParseError> {
+    fn for_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
         todo!()
     }
-    fn for_statement(&'input mut self) -> Result<Stmt, ParseError> {
-        todo!()
-    }
-    fn print_statement(&'input mut self) -> Result<Stmt, ParseError> {
-        todo!()
-    }
-
     /**
      * statement -> printStatement
      *              | blockStatement
@@ -92,11 +147,8 @@ impl<'input> StmtParser<'input> {
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
         match *current {
+            TokenKind::Print => self.print_statement(),
             /*
-            TokenKind::Print => {
-                self.cursor.advance()?;
-                self.print_statement()
-            }
             TokenKind::LeftBrace => {
                 self.cursor.advance()?;
                 self.block_statement()
@@ -122,6 +174,32 @@ impl<'input> StmtParser<'input> {
         }
     }
 
+    fn print_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
+        // position cursor at the start of the expression
+        // following `print`
+        let _ = self.cursor.advance()?;
+
+        // store 'print' span
+        let Token { span, .. } = self.cursor.take_previous()?;
+
+        // parse following expression
+        let mut expression_parser = ExprParser::new(&mut self.cursor);
+        let expr = expression_parser.parse()?;
+
+        let _ = self
+            .cursor
+            .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
+
+        dbg!(&expr);
+        Ok(Stmt {
+            kind: StmtKind::Print(Box::new(expr)),
+            span,
+        })
+    }
+
     /// parse an expression followed by a semicolon.
     fn expression_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
@@ -129,19 +207,14 @@ impl<'input> StmtParser<'input> {
     {
         let mut expression_parser = ExprParser::new(&mut self.cursor);
         let expr = expression_parser.parse()?;
-        if let Ok(Token {
-            kind: TokenKind::Semicolon,
-            ..
-        }) = self.cursor.current()
-        {
-            self.cursor.advance()?;
-            Ok(Stmt {
-                span: expr.span.clone(),
-                kind: StmtKind::Expr(Box::new(expr)),
-            })
-        } else {
-            Err(ParseError::ExpectedToken("missing ';'".to_string()))
-        }
+        let _ = self.cursor.consume(
+            TokenKind::Semicolon,
+            "Expected ';' add the end of statement.",
+        )?;
+        Ok(Stmt {
+            span: expr.span.clone(),
+            kind: StmtKind::Expr(Box::new(expr)),
+        })
     }
 
     /// Parse source into statements
@@ -159,7 +232,6 @@ impl<'input> StmtParser<'input> {
             // parse declaration, forward
             // errors (if any) and move the token cursor to the next
             // statement. (allow recovery in REPL environment)
-            dbg!(self.cursor.current());
             match self.declaration() {
                 Err(e) => {
                     self.cursor.move_to_next_stmt();
@@ -170,5 +242,61 @@ impl<'input> StmtParser<'input> {
         }
 
         Ok(statements)
+    }
+}
+
+#[cfg(test)]
+mod stmt_parsing {
+    use super::*;
+    use lexer::{Lexer, StrPeeker, TokenKind, Tokenize};
+
+    fn parse_statement(src: &str) -> Result<Vec<Stmt>, ParseError> {
+        let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
+        let mut parser = StmtParser::new(Box::new(lexer));
+        parser.parse()
+    }
+
+    #[test]
+    /// test parsing a single expression statement
+    fn parse_expression_statement() {
+        let src = "1;";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Expr(expr), .. }) = ast.pop() else {
+            panic!("failed to parse expression statement.") };
+        assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+    }
+
+    #[test]
+    /// test parsing a print statement
+    fn parse_print_statement() {
+        let src = r#"print "hello";"#;
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Print(expr), .. }) = ast.pop() else {
+            panic!("failed to parse print statement.") };
+        assert_eq!(
+            expr.kind,
+            ExprKind::Literal(LiteralKind::Str("hello".to_string()))
+        );
+    }
+
+    #[test]
+    /// test parsing a var statement
+    fn parse_var_statement() {
+        let src = "var a;";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Var(id, expr), .. }) = ast.pop() else {
+            panic!("failed to parse Var statement.") };
+        assert_eq!(id, "a".to_string());
+        assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Nil));
+    }
+
+    #[test]
+    fn parse_var_statement_with_initializer() {
+        let src = "var a = 1;";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Var(id, expr), .. }) = ast.pop() else {
+            panic!("failed to parse Var statement.") };
+        assert_eq!(id, "a".to_string());
+        assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
 }

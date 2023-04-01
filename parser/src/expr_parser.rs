@@ -60,7 +60,7 @@ where
     fn parse_precedence(cursor: &mut Cursor, precedence: Precedence) -> Result<Expr, ParseError> {
         let _ = cursor.advance()?;
         let prefix_fn = Self::get_prefix_handler(&cursor.previous()?.kind)
-            .ok_or(ParseError::ExpectedExpression)?;
+            .ok_or(ParseError::ExpectedExpression("Expected an expression"))?;
         let can_assign = precedence <= Precedence::Assignement;
 
         let mut expr = prefix_fn(cursor, can_assign)?;
@@ -68,20 +68,20 @@ where
         // Combine parsed expression with the next right expression,
         // if the next token is defines an infix expression.
         while let Some(next_expr_precedence) = Self::get_token_precedence(&cursor.current()?.kind) {
-            if next_expr_precedence < precedence {  // or <= ?
+            if next_expr_precedence < precedence {
+                // NOTE: not clear whether we should use < or <=
                 break;
             }
             let _ = cursor.advance()?;
             // call the rule associated with handling
             // expressing **CONTAINING** this token
-            let next_expr_parser_fn = Self::get_infix_handler(&cursor.previous()?.kind)
-                .ok_or(ParseError::ExpectedExpression)?;
+            let next_expr_parser_fn = Self::get_infix_handler(&cursor.previous()?.kind).ok_or(
+                ParseError::ExpectedExpression("Expected expression after infix operator."),
+            )?;
             expr = next_expr_parser_fn(cursor, expr, can_assign)?;
         }
         if can_assign && cursor.matches(TokenKind::Equal)? {
-            return Err(ParseError::ExpectedToken(
-                "Invalid assignement target.".into(),
-            ));
+            return Err(ParseError::ExpectedToken("Invalid assignement target."));
         }
         Ok(expr)
     }
@@ -152,12 +152,12 @@ where
 
     fn parse_grouping(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::LeftParen, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected '('.".to_string()));
+           return Err(ParseError::ExpectedToken("Expected '('."));
         };
         let inner_expression = Self::parse_precedence(cursor, Precedence::Assignement)?;
         let _ = cursor.advance()?;
         let Token { kind: TokenKind::RightParen, .. } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected ')'.".to_string()));
+           return Err(ParseError::ExpectedToken("Expected ')'."));
         };
 
         Ok(Expr {
@@ -169,7 +169,7 @@ where
     /// Build an Unary expression representing a "Minus" expression.
     fn parse_minus(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Minus, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected '-'.".to_string()));
+           return Err(ParseError::ExpectedToken("Expected '-'."));
         };
         let child_expression = Self::parse_precedence(cursor, Precedence::Unary)?;
 
@@ -182,7 +182,7 @@ where
     /// Build an Unary expression representing a "Not" expression.
     fn parse_not(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Bang, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected '!'.".to_string()));
+           return Err(ParseError::ExpectedToken("Expected '!'."));
         };
         let child_expression = Self::parse_precedence(cursor, Precedence::Unary)?;
 
@@ -195,7 +195,7 @@ where
     /// Build a Literal expression from a Number Token.
     fn parse_number(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Number(value), span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a number".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a number"));
         };
         Ok(Expr {
             kind: ExprKind::Literal(LiteralKind::Num(value)),
@@ -206,7 +206,7 @@ where
     /// Build a Literal expression from a String Token.
     fn parse_string(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Str(value), span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a string".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a string"));
         };
         Ok(Expr {
             kind: ExprKind::Literal(LiteralKind::Str(value)),
@@ -217,7 +217,7 @@ where
     /// Build a Literal expression from a Nil Token.
     fn parse_nil(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Nil, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a 'nil'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a 'nil'"));
         };
         Ok(Expr {
             kind: ExprKind::Literal(LiteralKind::Nil),
@@ -228,7 +228,7 @@ where
     /// Build a Literal expression from a `true` Token.
     fn parse_true(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::True, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a 'true'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a 'true'"));
         };
         Ok(Expr {
             kind: ExprKind::Literal(LiteralKind::Bool(true)),
@@ -239,7 +239,7 @@ where
     /// Build a Literal expression from a `false` Token.
     fn parse_false(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::False, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a 'false'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a 'false'"));
         };
         Ok(Expr {
             kind: ExprKind::Literal(LiteralKind::Bool(false)),
@@ -250,7 +250,7 @@ where
     /// Build a `Variable` expression from an `Identifier` Token.
     fn parse_variable(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Identifier(name), span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected an identifier".to_string()));
+           return Err(ParseError::ExpectedToken("Expected an identifier"));
         };
         Ok(Expr {
             kind: ExprKind::Variable(name),
@@ -261,15 +261,15 @@ where
     /// Build a `Super` expression from an [`Super`, `Dot`, `Identifier`] Token sequences.
     fn parse_super(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Super, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected 'super'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected 'super'"));
         };
         let _ = cursor.advance()?;
         let Token { kind: TokenKind::Dot, span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected '.'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected '.'"));
         };
         let _ = cursor.advance()?;
         let Token { kind: TokenKind::Identifier(method_name), span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected a method identifier".to_string()));
+           return Err(ParseError::ExpectedToken("Expected a method identifier"));
         };
         Ok(Expr {
             kind: ExprKind::Super(method_name),
@@ -280,7 +280,7 @@ where
     /// Build a `This` expression from a `This` token.
     fn parse_this(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::This, span: this_span } = cursor.take_previous()? else {
-           return Err(ParseError::ExpectedToken("Expected 'this'".to_string()));
+           return Err(ParseError::ExpectedToken("Expected 'this'"));
         };
         Ok(Expr {
             kind: ExprKind::This,
@@ -447,7 +447,7 @@ where
         // get identifier (eg: attribute name)
         let _ = cursor.advance()?;
         let Token { kind: TokenKind::Identifier(id), .. } = cursor.take_previous()? else {
-             return Err(ParseError::ExpectedToken("Expected an identifier after '.'".to_string()));
+             return Err(ParseError::ExpectedToken("Expected an identifier after '.'"));
         };
 
         if can_assign && cursor.matches(TokenKind::Equal)? {
@@ -477,9 +477,9 @@ where
         // store the span of the `=` token
         let Token { span, .. } = cursor.take_previous()?;
         let Expr { kind: ExprKind::Variable(id), .. } = lvalue else {
-            return Err(ParseError::ExpectedToken("Can only assign to variables".to_string()));
+            return Err(ParseError::ExpectedToken("Can only assign to variables"));
         };
-         
+
         let rvalue = Self::parse_precedence(cursor, Precedence::Or)?;
         Ok(Expr {
             kind: ExprKind::Assign(id, Box::new(rvalue)),
@@ -792,7 +792,6 @@ mod parsing {
         assert_eq!(attribute, "b".to_string());
         assert_eq!(rvalue.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
-
 
     #[test]
     fn parse_assign() {
