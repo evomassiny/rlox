@@ -27,7 +27,11 @@ impl<'input> StmtParser<'input> {
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
         match *current {
-            TokenKind::Var => self.var_declaration(),
+            TokenKind::Var => {
+                // position cursor rigt after `var` token;
+                self.cursor.advance()?;
+                self.var_declaration()
+            }
             /*
             TokenKind::Class => {
                 self.cursor.advance()?;
@@ -43,13 +47,11 @@ impl<'input> StmtParser<'input> {
     }
 
     /// parse a var declaration
+    /// assume `var` has been parsed
     fn var_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
     {
-        // position cursor rigt after `var` token;
-        let _ = self.cursor.advance()?;
-
         // store span of `var` token
         let Token { span: var_span, .. } = self.cursor.take_previous()?;
 
@@ -101,18 +103,28 @@ impl<'input> StmtParser<'input> {
         todo!()
     }
 
+    /// parse block statement
+    /// assumes `{` has been parsed.
     fn block_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
     {
-        todo!()
+        let Token { span, .. } = self.cursor.take_previous()?;
+
+        // parse sub-statements until we encounter a '}'
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.cursor.check(TokenKind::RightBrace)? {
+            let stmt = self.declaration()?;
+            statements.push(stmt);
+        }
+        self.cursor
+            .consume(TokenKind::RightParen, "Expect '}' after block.")?;
+        Ok(Stmt {
+            kind: StmtKind::Block(statements),
+            span,
+        })
     }
-    fn if_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
-    where
-        'input: 'parser,
-    {
-        todo!()
-    }
+
     fn return_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
@@ -147,16 +159,22 @@ impl<'input> StmtParser<'input> {
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
         match *current {
-            TokenKind::Print => self.print_statement(),
-            /*
+            TokenKind::Print => {
+                // position cursor right after `print
+                let _ = self.cursor.advance();
+                self.print_statement()
+            }
             TokenKind::LeftBrace => {
-                self.cursor.advance()?;
+                // position cursor right after `{`
+                let _ = self.cursor.advance();
                 self.block_statement()
             }
             TokenKind::If => {
-                self.cursor.advance()?;
+                // position cursor right after `if
+                let _ = self.cursor.advance();
                 self.if_statement()
             }
+            /*
             TokenKind::Return => {
                 self.cursor.advance()?;
                 self.return_statement()
@@ -174,14 +192,12 @@ impl<'input> StmtParser<'input> {
         }
     }
 
+    /// parse a print statement,
+    /// assume `print` has been parsed
     fn print_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
     {
-        // position cursor at the start of the expression
-        // following `print`
-        let _ = self.cursor.advance()?;
-
         // store 'print' span
         let Token { span, .. } = self.cursor.take_previous()?;
 
@@ -196,6 +212,58 @@ impl<'input> StmtParser<'input> {
         dbg!(&expr);
         Ok(Stmt {
             kind: StmtKind::Print(Box::new(expr)),
+            span,
+        })
+    }
+
+    fn if_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    where
+        'input: 'parser,
+    {
+        // store 'if' span
+        let Token { span, .. } = self.cursor.take_previous()?;
+
+        // consume '('
+        let _ = self.cursor.consume(
+            TokenKind::LeftParen,
+            "Expected a parenthesised condition after an if statement.",
+        )?;
+        // parse condition
+        let mut expression_parser = ExprParser::new(&mut self.cursor);
+        let cond_expr = expression_parser.parse()?;
+        // consume ')'
+        let _ = self.cursor.consume(
+            TokenKind::LeftParen,
+            "Expected a closing after an 'if' condition.",
+        )?;
+        // parse then branch
+        if !self.cursor.matches(TokenKind::LeftBrace)? {
+            return Err(ParseError::ExpectedExpression(
+                "Expect a 'then' branch after an if condition (eg: '{')",
+            ));
+        }
+        let then_block = self.block_statement()?;
+
+        // case with no `else` branch
+        if !self.cursor.matches(TokenKind::Else)? {
+            return Ok(Stmt {
+                kind: StmtKind::If(Box::new(cond_expr), Box::new(then_block), None),
+                span,
+            });
+        }
+
+        // consume '{'
+        let _ = self.cursor.consume(
+            TokenKind::LeftParen,
+            "Expected a '{' after an else statement.",
+        )?;
+        let else_block = self.block_statement()?;
+        Ok(Stmt {
+            kind: StmtKind::If(
+                Box::new(cond_expr),
+                Box::new(then_block),
+                Some(Box::new(else_block)),
+            ),
             span,
         })
     }
@@ -298,5 +366,41 @@ mod stmt_parsing {
             panic!("failed to parse Var statement.") };
         assert_eq!(id, "a".to_string());
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+    }
+
+    #[test]
+    fn parse_block_statement() {
+        let src = "{ 1; }";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Block(mut statements), .. }) = ast.pop() else {
+            panic!("failed to parse Block statement.") };
+
+        let Some(Stmt { kind: StmtKind::Expr(expr), .. }) = statements.pop() else {
+            panic!("failed to parse inner expression in Block statement.") };
+        assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+    }
+
+    #[test]
+    fn parse_if_statement() {
+        let src = "if (true) { 1; }";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::If(cond_expr, then_block, None), .. }) = ast.pop() else {
+            panic!("failed to parse If statement.") };
+        assert_eq!(cond_expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        let Stmt { kind: StmtKind::Block(_), .. } = *then_block else {
+            panic!("failed to parse then branch as Block statement.") };
+    }
+
+    #[test]
+    fn parse_if_statement_with_else_branch() {
+        let src = "if (true) { 1; } else { 2; }";
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::If(cond_expr, then_block, Some(else_block)), .. }) = ast.pop() else {
+            panic!("failed to parse If statement.") };
+        assert_eq!(cond_expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
+        let Stmt { kind: StmtKind::Block(_), .. } = *then_block else {
+            panic!("failed to parse 'then' branch as Block statement.") };
+        let Stmt { kind: StmtKind::Block(_), .. } = *else_block else {
+            panic!("failed to parse 'else' branch as Block statement.") };
     }
 }
