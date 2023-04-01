@@ -53,11 +53,11 @@ pub enum ExprKind {
     /// callee, parenthesis, Args
     Call(Box<Expr>, Vec<Expr>),
     /// Object, attribute
-    Get(Box<Expr>, Token),
+    Get(Box<Expr>, String),
     /// Object, attribute, value
-    Set(Box<Expr>, Token, Box<Expr>),
-    /// left hand side, right hand side
-    Assign(Token, Box<Expr>),
+    Set(Box<Expr>, String, Box<Expr>),
+    /// l_value (identifier), r_value
+    Assign(String, Box<Expr>),
     /// method
     Super(String),
     /// keyword

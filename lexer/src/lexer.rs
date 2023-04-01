@@ -155,7 +155,6 @@ impl<T: PeekOffset> Tokenize for Lexer<T> {
         if let Some(token) = self.try_parse_number(c) {
             return Ok(token);
         }
-        dbg!(&c);
         match c {
             '(' => Ok(Token {
                 kind: TokenKind::LeftParen,

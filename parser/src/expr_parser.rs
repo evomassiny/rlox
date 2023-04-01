@@ -68,10 +68,10 @@ where
         // Combine parsed expression with the next right expression,
         // if the next token is defines an infix expression.
         while let Some(next_expr_precedence) = Self::get_token_precedence(&cursor.current()?.kind) {
-            if next_expr_precedence <= precedence {
+            if next_expr_precedence < precedence {  // or <= ?
                 break;
             }
-            let _ = cursor.advance();
+            let _ = cursor.advance()?;
             // call the rule associated with handling
             // expressing **CONTAINING** this token
             let next_expr_parser_fn = Self::get_infix_handler(&cursor.previous()?.kind)
@@ -120,7 +120,8 @@ where
             | &TokenKind::Less => Some(Precedence::Comparison),
             &TokenKind::Or => Some(Precedence::Or),
             &TokenKind::And => Some(Precedence::And),
-            &TokenKind::LeftParen => Some(Precedence::Call),
+            &TokenKind::LeftParen | &TokenKind::Dot => Some(Precedence::Call),
+            &TokenKind::Equal => Some(Precedence::Assignement),
             _ => None,
         }
     }
@@ -130,8 +131,9 @@ where
     /// expression if we found the token while parsing a bigger expression
     fn get_infix_handler(kind: &TokenKind) -> Option<InfixParserFn> {
         match kind {
+            &TokenKind::Equal => Some(Self::parse_assign),
+            &TokenKind::Dot => Some(Self::parse_get_or_set),
             &TokenKind::LeftParen => Some(Self::parse_call),
-            &TokenKind::Dot => todo!(),
             &TokenKind::Minus => Some(Self::parse_substraction),
             &TokenKind::Plus => Some(Self::parse_sum),
             &TokenKind::Slash => Some(Self::parse_division),
@@ -148,7 +150,7 @@ where
         }
     }
 
-    fn parse_grouping(cursor: &mut Cursor, can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_grouping(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::LeftParen, span } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected '('.".to_string()));
         };
@@ -165,7 +167,7 @@ where
     }
 
     /// Build an Unary expression representing a "Minus" expression.
-    fn parse_minus(cursor: &mut Cursor, can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_minus(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Minus, span } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected '-'.".to_string()));
         };
@@ -178,7 +180,7 @@ where
     }
 
     /// Build an Unary expression representing a "Not" expression.
-    fn parse_not(cursor: &mut Cursor, can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_not(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
         let Token { kind: TokenKind::Bang, span } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected '!'.".to_string()));
         };
@@ -430,6 +432,59 @@ where
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
         Self::parse_binary_expression(cursor, lhs, Precedence::Unary, BinaryExprKind::Div)
+    }
+
+    /// Build a Get or a Set Expr,
+    /// (assumes the '.' token has just been parsed)
+    fn parse_get_or_set(
+        cursor: &mut Cursor,
+        lhs: Expr,
+        can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        // store the span of the `dot` token
+        let Token { span: dot_span, .. } = cursor.take_previous()?;
+
+        // get identifier (eg: attribute name)
+        let _ = cursor.advance()?;
+        let Token { kind: TokenKind::Identifier(id), .. } = cursor.take_previous()? else {
+             return Err(ParseError::ExpectedToken("Expected an identifier after '.'".to_string()));
+        };
+
+        if can_assign && cursor.matches(TokenKind::Equal)? {
+            let Token {
+                span: equal_span, ..
+            } = cursor.take_previous()?;
+            let rvalue = Self::parse_precedence(cursor, Precedence::Assignement)?;
+            return Ok(Expr {
+                kind: ExprKind::Set(Box::new(lhs), id, Box::new(rvalue)),
+                span: equal_span,
+            });
+        }
+        Ok(Expr {
+            kind: ExprKind::Get(Box::new(lhs), id),
+            span: dot_span,
+        })
+    }
+
+    // parse an assignment,
+    // eg: `IDENTIFER = EXPRESSION`
+    // (assumes that '=' token has just been parsed).
+    fn parse_assign(
+        cursor: &mut Cursor,
+        lvalue: Expr,
+        can_assign: bool,
+    ) -> Result<Expr, ParseError> {
+        // store the span of the `=` token
+        let Token { span, .. } = cursor.take_previous()?;
+        let Expr { kind: ExprKind::Variable(id), .. } = lvalue else {
+            return Err(ParseError::ExpectedToken("Can only assign to variables".to_string()));
+        };
+         
+        let rvalue = Self::parse_precedence(cursor, Precedence::Or)?;
+        Ok(Expr {
+            kind: ExprKind::Assign(id, Box::new(rvalue)),
+            span: span,
+        })
     }
 }
 
@@ -714,5 +769,38 @@ mod parsing {
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(rhs.kind, ExprKind::Literal(LiteralKind::Num(2.)));
         assert_eq!(token_kind, BinaryExprKind::Mul);
+    }
+
+    #[test]
+    fn parse_getter() {
+        let src = "a.b";
+        let expr = parse_expression(&src).unwrap();
+
+        dbg!(&expr);
+        let ExprKind::Get(instance, attribute) = expr.kind else { panic!("failed to parse Get expression") };
+        assert_eq!(instance.kind, ExprKind::Variable("a".to_string()));
+        assert_eq!(attribute, "b".to_string());
+    }
+
+    #[test]
+    fn parse_setter() {
+        let src = "a.b = 1";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Set(instance, attribute, rvalue) = expr.kind else { panic!("failed to parse Set expression") };
+        assert_eq!(instance.kind, ExprKind::Variable("a".to_string()));
+        assert_eq!(attribute, "b".to_string());
+        assert_eq!(rvalue.kind, ExprKind::Literal(LiteralKind::Num(1.)));
+    }
+
+
+    #[test]
+    fn parse_assign() {
+        let src = "a = 1";
+        let expr = parse_expression(&src).unwrap();
+
+        let ExprKind::Assign(lvalue, rvalue) = expr.kind else { panic!("failed to parse Assign expression") };
+        assert_eq!(&lvalue, "a");
+        assert_eq!(rvalue.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
 }

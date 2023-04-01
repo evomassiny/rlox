@@ -69,8 +69,9 @@ impl<'input> Cursor<'input> {
     }
 
     /// returns `true` if the current token if of type `kind`
+    /// only check the variant type, not embeded values( if any)
     pub fn check(&self, kind: TokenKind) -> Result<bool, ParseError> {
-        Ok(kind == self.current()?.kind)
+        Ok(std::mem::discriminant(&kind) == std::mem::discriminant(&self.current()?.kind))
     }
 
     /// returns `true` if the current token if of type `kind`,
