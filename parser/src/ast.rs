@@ -19,7 +19,7 @@ pub enum StmtKind {
     /// condition, then branch, else branch
     If(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
     /// function name, args, body
-    Function(String, Vec<Token>, Vec<Stmt>),
+    Function(String, Vec<String>, Vec<Stmt>),
     Expr(Box<Expr>),
     Print(Box<Expr>),
     Return(Option<Box<Expr>>),
@@ -27,6 +27,13 @@ pub enum StmtKind {
     Var(String, Box<Expr>),
     /// condition, body
     While(Box<Expr>, Box<Stmt>),
+    /// initializer, condition, increment, body
+    For(
+        Option<Box<Expr>>,
+        Option<Box<Expr>>,
+        Option<Box<Expr>>,
+        Box<Stmt>,
+    ),
 }
 
 /// an Expression

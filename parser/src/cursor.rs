@@ -1,4 +1,4 @@
-use lexer::{Span, LexerError, Token, TokenKind, Tokenize};
+use lexer::{LexerError, Span, Token, TokenKind, Tokenize};
 
 #[derive(Debug)]
 pub enum ParseError {
