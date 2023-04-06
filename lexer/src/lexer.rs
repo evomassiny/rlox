@@ -123,10 +123,16 @@ impl<T: PeekOffset> Lexer<T> {
 }
 
 pub trait Tokenize {
+    /// lex _one_ token
     fn scan_next(&mut self) -> Result<Token, LexerError>;
+    /// return the current position
+    fn current_position(&mut self) -> Span;
 }
 
 impl<T: PeekOffset> Tokenize for Lexer<T> {
+    fn current_position(&mut self) -> Span {
+        self.input.span()
+    }
     fn scan_next(&mut self) -> Result<Token, LexerError> {
         // read next non-whitespace character
         let c: char = {

@@ -1,6 +1,6 @@
 use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
 use super::cursor::{Cursor, ParseError};
-use lexer::{Span, Token, TokenKind, Tokenize};
+use lexer::{Token, TokenKind, Tokenize};
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.
@@ -260,11 +260,11 @@ where
 
     /// Build a `Super` expression from an [`Super`, `Dot`, `Identifier`] Token sequences.
     fn parse_super(cursor: &mut Cursor, _can_assign: bool) -> Result<Expr, ParseError> {
-        let Token { kind: TokenKind::Super, span } = cursor.take_previous()? else {
+        let Token { kind: TokenKind::Super, .. } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected 'super'"));
         };
         let _ = cursor.advance()?;
-        let Token { kind: TokenKind::Dot, span } = cursor.take_previous()? else {
+        let Token { kind: TokenKind::Dot, .. } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected '.'"));
         };
         let _ = cursor.advance()?;
@@ -474,6 +474,9 @@ where
         lvalue: Expr,
         can_assign: bool,
     ) -> Result<Expr, ParseError> {
+        if !can_assign {
+            return Err(ParseError::ExpectedToken("unexpected assignment"));
+        }
         // store the span of the `=` token
         let Token { span, .. } = cursor.take_previous()?;
         let Expr { kind: ExprKind::Variable(id), .. } = lvalue else {

@@ -1,4 +1,4 @@
-use lexer::{LexerError, Token, TokenKind, Tokenize};
+use lexer::{Span, LexerError, Token, TokenKind, Tokenize};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -139,5 +139,11 @@ impl<'input> Cursor<'input> {
                 }
             }
         }
+    }
+
+    /// get the current position of the cursor,
+    /// (in the source input string).
+    pub fn current_position(&mut self) -> Span {
+        self.lexer.current_position()
     }
 }

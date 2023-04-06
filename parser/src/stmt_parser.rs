@@ -302,6 +302,8 @@ impl<'input> StmtParser<'input> {
             // statement. (allow recovery in REPL environment)
             match self.declaration() {
                 Err(e) => {
+                    let span = self.cursor.current_position();
+                    dbg!("error at {span}");
                     self.cursor.move_to_next_stmt();
                     return Err(e);
                 }
