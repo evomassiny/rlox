@@ -44,7 +44,7 @@ impl HeapCompactor {
         let mut selected_threshold: Option<usize> = None;
 
         // Group blocks by hole count, and sum the number of free slots.
-        let mut free_count_by_hole_count: [usize; MAX_NB_OF_HOLE_IN_BLOCK] =
+        let free_count_by_hole_count: [usize; MAX_NB_OF_HOLE_IN_BLOCK] =
             memory.compute_availabily_histogram();
 
         // compute the whole number of free slots

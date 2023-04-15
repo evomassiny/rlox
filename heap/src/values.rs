@@ -1,4 +1,4 @@
-use crate::heap_objects::{Header, Markable, ObjectRef};
+use crate::heap_objects::{Header, ObjectRef};
 use crate::lists::List;
 use crate::strings::Str;
 use std::ptr::{addr_of, NonNull};

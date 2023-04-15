@@ -65,7 +65,7 @@ impl<T: PeekOffset> Lexer<T> {
             identifier.push(c);
         }
         for _ in 0..(identifier.len() - 1) {
-            let c = self.input.advance();
+            let _c = self.input.advance();
         }
         Some(Token {
             kind: TokenKind::parse_string(identifier),

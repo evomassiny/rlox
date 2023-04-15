@@ -60,9 +60,9 @@ impl<'input> Cursor<'input> {
 
     /// consume one token from the lexer,
     /// return an error if it doesn't match `kind`
-    pub fn consume(&mut self, kind: TokenKind, err_msg: &'static str) -> Result<(), ParseError> {
-        let _ = self.advance()?;
-        if !matches!(&self.previous()?.kind, kind) {
+    pub fn consume(&mut self, _kind: TokenKind, err_msg: &'static str) -> Result<(), ParseError> {
+        self.advance()?;
+        if !matches!(&self.previous()?.kind, _kind) {
             return Err(ParseError::ExpectedToken(err_msg));
         }
         Ok(())
@@ -80,7 +80,7 @@ impl<'input> Cursor<'input> {
         if !self.check(kind)? {
             return Ok(false);
         }
-        let _ = self.advance()?;
+        self.advance()?;
         Ok(true)
     }
 

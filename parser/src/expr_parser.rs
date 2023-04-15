@@ -1,6 +1,6 @@
 use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
 use super::cursor::{Cursor, ParseError};
-use lexer::{Token, TokenKind, Tokenize};
+use lexer::{Token, TokenKind};
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.
@@ -58,7 +58,7 @@ where
     /// Parse all encountered expressions until we reach
     /// a token associated with a binding power lower than `precedence`
     fn parse_precedence(cursor: &mut Cursor, precedence: Precedence) -> Result<Expr, ParseError> {
-        let _ = cursor.advance()?;
+        cursor.advance()?;
         let prefix_fn = Self::get_prefix_handler(&cursor.previous()?.kind)
             .ok_or(ParseError::ExpectedExpression("Expected an expression"))?;
         let can_assign = precedence <= Precedence::Assignement;
@@ -72,7 +72,7 @@ where
                 // NOTE: not clear whether we should use < or <=
                 break;
             }
-            let _ = cursor.advance()?;
+            cursor.advance()?;
             // call the rule associated with handling
             // expressing **CONTAINING** this token
             let next_expr_parser_fn = Self::get_infix_handler(&cursor.previous()?.kind).ok_or(
@@ -155,7 +155,7 @@ where
            return Err(ParseError::ExpectedToken("Expected '('."));
         };
         let inner_expression = Self::parse_precedence(cursor, Precedence::Assignement)?;
-        let _ = cursor.advance()?;
+        cursor.advance()?;
         let Token { kind: TokenKind::RightParen, .. } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected ')'."));
         };
@@ -263,11 +263,11 @@ where
         let Token { kind: TokenKind::Super, .. } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected 'super'"));
         };
-        let _ = cursor.advance()?;
+        cursor.advance()?;
         let Token { kind: TokenKind::Dot, .. } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected '.'"));
         };
-        let _ = cursor.advance()?;
+        cursor.advance()?;
         let Token { kind: TokenKind::Identifier(method_name), span } = cursor.take_previous()? else {
            return Err(ParseError::ExpectedToken("Expected a method identifier"));
         };
@@ -301,7 +301,7 @@ where
         while !matches!(cursor.current()?.kind, TokenKind::RightParen) {
             arguments.push(Self::parse_precedence(cursor, Precedence::Assignement)?);
             if matches!(cursor.current()?.kind, TokenKind::Comma) {
-                let _ = cursor.advance()?;
+                cursor.advance()?;
             }
         }
         Ok(Expr {
@@ -445,7 +445,7 @@ where
         let Token { span: dot_span, .. } = cursor.take_previous()?;
 
         // get identifier (eg: attribute name)
-        let _ = cursor.advance()?;
+        cursor.advance()?;
         let Token { kind: TokenKind::Identifier(id), .. } = cursor.take_previous()? else {
              return Err(ParseError::ExpectedToken("Expected an identifier after '.'"));
         };
@@ -486,7 +486,7 @@ where
         let rvalue = Self::parse_precedence(cursor, Precedence::Or)?;
         Ok(Expr {
             kind: ExprKind::Assign(id, Box::new(rvalue)),
-            span: span,
+            span,
         })
     }
 }
@@ -496,7 +496,7 @@ mod parsing {
     use super::ExprParser;
     use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
     use crate::cursor::{Cursor, ParseError};
-    use lexer::{Lexer, StrPeeker, TokenKind, Tokenize};
+    use lexer::{Lexer, StrPeeker};
 
     fn parse_expression(src: &str) -> Result<Expr, ParseError> {
         let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
@@ -509,14 +509,14 @@ mod parsing {
     #[test]
     fn parse_number() {
         let src = "1";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
 
     #[test]
     fn parse_string() {
         let src = r#" "str" "#;
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(
             expr.kind,
             ExprKind::Literal(LiteralKind::Str("str".to_string()))
@@ -526,49 +526,49 @@ mod parsing {
     #[test]
     fn parse_nil() {
         let src = "nil";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Nil));
     }
 
     #[test]
     fn parse_true() {
         let src = "true";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
     }
 
     #[test]
     fn parse_false() {
         let src = "false";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Bool(false)));
     }
 
     #[test]
     fn parse_variable() {
         let src = "a";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Variable("a".to_string()));
     }
 
     #[test]
     fn parse_super() {
         let src = "super.method_name";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::Super("method_name".to_string()));
     }
 
     #[test]
     fn parse_this() {
         let src = "this";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         assert_eq!(expr.kind, ExprKind::This);
     }
 
     #[test]
     fn parse_group() {
         let src = "(1)";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         let ExprKind::Grouping(inner_expr) = expr.kind else { panic!("failed to parse group") };
         assert_eq!(inner_expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
@@ -576,7 +576,7 @@ mod parsing {
     #[test]
     fn parse_unary_minus() {
         let src = "-1";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         let ExprKind::Unary(UnaryExprKind::Minus, inner_expr) = expr.kind else {
             panic!("failed to parse minus") 
         };
@@ -586,7 +586,7 @@ mod parsing {
     #[test]
     fn parse_unary_not() {
         let src = "!true";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
         let ExprKind::Unary(UnaryExprKind::Not, inner_expr) = expr.kind else {
             panic!("failed to parse 'not'") 
         };
@@ -596,7 +596,7 @@ mod parsing {
     #[test]
     fn parse_sum() {
         let src = "1 + 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -607,7 +607,7 @@ mod parsing {
     #[test]
     fn parse_substraction() {
         let src = "1 - 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -618,7 +618,7 @@ mod parsing {
     #[test]
     fn parse_product() {
         let src = "1 * 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse product") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -629,7 +629,7 @@ mod parsing {
     #[test]
     fn parse_division() {
         let src = "1 / 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse division") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -640,7 +640,7 @@ mod parsing {
     #[test]
     fn parse_not_equal() {
         let src = "1 != 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -651,7 +651,7 @@ mod parsing {
     #[test]
     fn parse_equal() {
         let src = "1 == 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -662,7 +662,7 @@ mod parsing {
     #[test]
     fn parse_less() {
         let src = "1 < 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -673,7 +673,7 @@ mod parsing {
     #[test]
     fn parse_less_equal() {
         let src = "1 <= 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -684,7 +684,7 @@ mod parsing {
     #[test]
     fn parse_greater() {
         let src = "1 > 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -695,7 +695,7 @@ mod parsing {
     #[test]
     fn parse_greater_equal() {
         let src = "1 >= 2";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse equality") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Num(1.)));
@@ -706,7 +706,7 @@ mod parsing {
     #[test]
     fn parse_and() {
         let src = "true and true";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Logical(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse logical expression") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
@@ -717,7 +717,7 @@ mod parsing {
     #[test]
     fn parse_or() {
         let src = "true or true";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Logical(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse logical expression") };
         assert_eq!(lhs.kind, ExprKind::Literal(LiteralKind::Bool(true)));
@@ -729,7 +729,7 @@ mod parsing {
     fn parse_call_no_arg() {
         // test with no args
         let src = "fn()";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression") };
         assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
@@ -740,7 +740,7 @@ mod parsing {
     fn parse_call_one_arg() {
         // test with one arg
         let src = "fn(1)";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression with one arg") };
         assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
@@ -751,7 +751,7 @@ mod parsing {
     fn parse_call_several_args() {
         // test with two arg
         let src = "fn(1, 2)";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Call(callee, arguments) = expr.kind else { panic!("failed to parse call expression with several args") };
         assert_eq!(callee.kind, ExprKind::Variable("fn".to_string()));
@@ -761,7 +761,7 @@ mod parsing {
     #[test]
     fn parse_sum_of_product() {
         let src = "1 * 2 + 3";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Binary(lhs, token_kind, rhs) = expr.kind else { panic!("failed to parse sum") };
         assert_eq!(token_kind, BinaryExprKind::Add);
@@ -777,7 +777,7 @@ mod parsing {
     #[test]
     fn parse_getter() {
         let src = "a.b";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         dbg!(&expr);
         let ExprKind::Get(instance, attribute) = expr.kind else { panic!("failed to parse Get expression") };
@@ -788,7 +788,7 @@ mod parsing {
     #[test]
     fn parse_setter() {
         let src = "a.b = 1";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Set(instance, attribute, rvalue) = expr.kind else { panic!("failed to parse Set expression") };
         assert_eq!(instance.kind, ExprKind::Variable("a".to_string()));
@@ -799,7 +799,7 @@ mod parsing {
     #[test]
     fn parse_assign() {
         let src = "a = 1";
-        let expr = parse_expression(&src).unwrap();
+        let expr = parse_expression(src).unwrap();
 
         let ExprKind::Assign(lvalue, rvalue) = expr.kind else { panic!("failed to parse Assign expression") };
         assert_eq!(&lvalue, "a");

@@ -32,7 +32,7 @@ impl Heap {
         self.compactor.init_cycle(&mut self.memory);
     }
     pub fn mark(&mut self, value: &Value) {
-        self.compactor.mark_and_compact(value, &mut self.memory);
+        let _ = self.compactor.mark_and_compact(value, &mut self.memory);
     }
 
     pub fn end_gc_cycle(&mut self) {

@@ -1,4 +1,4 @@
-use lexer::{Span, Token, TokenKind};
+use lexer::{Span};
 
 /// A Statement
 /// (source that don't evaluate to a value)
