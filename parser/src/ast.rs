@@ -14,8 +14,8 @@ pub struct Stmt {
 pub enum StmtKind {
     /// List of inner statements
     Block(Vec<Stmt>),
-    /// Class name, super class variable, functions
-    Class(TokenKind, Option<Box<Expr>>, Vec<Stmt>),
+    /// Class name, super class variable name, functions
+    Class(String, Option<String>, Vec<Stmt>),
     /// condition, then branch, else branch
     If(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
     /// function name, args, body

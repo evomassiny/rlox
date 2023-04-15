@@ -35,12 +35,10 @@ impl<'input> StmtParser<'input> {
                 self.cursor.advance()?;
                 self.var_declaration()
             }
-            /*
             TokenKind::Class => {
                 self.cursor.advance()?;
                 self.class_declaration()
             }
-            */
             TokenKind::Fun => {
                 self.cursor.advance()?;
                 self.fun_declaration()
@@ -65,6 +63,7 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
+        dbg!(&current);
         match *current {
             TokenKind::Print => {
                 // position cursor right after `print
@@ -139,11 +138,63 @@ impl<'input> StmtParser<'input> {
         }
     }
 
+    /// parse a class declaration (including its methods)
+    /// assume `class` has been parsed.
     fn class_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
     {
-        todo!()
+        // store span of `class` token
+        let Token {
+            span: class_span, ..
+        } = self.cursor.take_previous()?;
+
+        // parse class name
+        let _ = self.cursor.advance()?;
+        let Token { kind: TokenKind::Identifier(class_name), .. } = self.cursor.take_previous()? else {
+            return Err(ParseError::ExpectedToken("expected class name in class declaration."));
+        };
+
+        // parse super class name if any
+        let mut super_class: Option<String> = None;
+        if self.cursor.matches(TokenKind::Less)? {
+            let _ = self.cursor.advance()?;
+            let Token { kind: TokenKind::Identifier(name), .. } = self.cursor.take_previous()? else {
+                return Err(ParseError::ExpectedToken(
+                        "expected identifier in class inheritance declaration."
+                    ));
+            };
+            super_class = Some(name);
+        }
+
+        let _ = self.cursor.consume(
+            TokenKind::LeftBrace,
+            "Expected '{' after class declaration.",
+        )?;
+
+        let mut methods: Vec<Stmt> = Vec::new();
+        while !self.cursor.check(TokenKind::RightBrace)? {
+            let _ = self.cursor.advance()?;
+            let Token { kind: TokenKind::Identifier(name), span } = self.cursor.take_previous()? else {
+                return Err(ParseError::ExpectedToken("expected method name in class declaration."));
+            };
+            let arguments = self.parse_function_args()?;
+            let body = self.parse_function_body()?;
+            let method = Stmt {
+                kind: StmtKind::Function(name, arguments, body),
+                span,
+            };
+            methods.push(method);
+        }
+
+        let _ = self.cursor.consume(
+            TokenKind::RightBrace,
+            "Expected '{' after class declaration.",
+        )?;
+        Ok(Stmt {
+            kind: StmtKind::Class(class_name, super_class, methods),
+            span: class_span,
+        })
     }
 
     fn fun_declaration<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
@@ -156,38 +207,11 @@ impl<'input> StmtParser<'input> {
             return Err(ParseError::ExpectedToken("expected identifier in function declaration."));
         };
         // parse arguments
-        let mut arguments: Vec<String> = Vec::new();
-        let _ = self.cursor.consume(
-            TokenKind::LeftParen,
-            "Expected '(' after function declaration.",
-        )?;
-        while !self.cursor.matches(TokenKind::RightParen)? {
-            let _ = self.cursor.advance()?;
-            let Token { kind: TokenKind::Identifier(arg_name), .. } = self.cursor.take_previous()? else {
-                return Err(ParseError::ExpectedToken("expected identifier in function arguments."));
-            };
-            arguments.push(arg_name);
-
-            if self.cursor.check(TokenKind::Comma)? {
-                let _ = self.cursor.advance()?;
-            }
-        }
-
+        let arguments: Vec<String> = self.parse_function_args()?;
         // parse body
-        let _ = self.cursor.consume(
-            TokenKind::LeftBrace,
-            "Expected function body after arguments in function declaration.",
-        )?;
-        let mut statements: Vec<Stmt> = Vec::new();
-        while !self.cursor.check(TokenKind::RightBrace)? {
-            let stmt = self.declaration()?;
-            statements.push(stmt);
-        }
-        let _ = self
-            .cursor
-            .consume(TokenKind::RightBrace, "Expected '}' after function body.")?;
+        let body: Vec<Stmt> = self.parse_function_body()?;
         Ok(Stmt {
-            kind: StmtKind::Function(fn_name, arguments, statements),
+            kind: StmtKind::Function(fn_name, arguments, body),
             span,
         })
     }
@@ -392,6 +416,43 @@ impl<'input> StmtParser<'input> {
         expression_parser.parse()
     }
 
+    fn parse_function_args(&mut self) -> Result<Vec<String>, ParseError> {
+        // parse arguments
+        let mut arguments: Vec<String> = Vec::new();
+        let _ = self.cursor.consume(
+            TokenKind::LeftParen,
+            "Expected '(' after function declaration.",
+        )?;
+        while !self.cursor.matches(TokenKind::RightParen)? {
+            let _ = self.cursor.advance()?;
+            let Token { kind: TokenKind::Identifier(arg_name), .. } = self.cursor.take_previous()? else {
+                return Err(ParseError::ExpectedToken("expected identifier in function arguments."));
+            };
+            arguments.push(arg_name);
+
+            if self.cursor.check(TokenKind::Comma)? {
+                let _ = self.cursor.advance()?;
+            }
+        }
+        Ok(arguments)
+    }
+
+    fn parse_function_body(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let _ = self.cursor.consume(
+            TokenKind::LeftBrace,
+            "Expected function body after arguments in function declaration.",
+        )?;
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.cursor.check(TokenKind::RightBrace)? {
+            let stmt = self.declaration()?;
+            statements.push(stmt);
+        }
+        let _ = self
+            .cursor
+            .consume(TokenKind::RightBrace, "Expected '}' after function body.")?;
+        Ok(statements)
+    }
+
     /// parse an expression followed by a semicolon.
     fn expression_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
     where
@@ -440,7 +501,7 @@ impl<'input> StmtParser<'input> {
 #[cfg(test)]
 mod stmt_parsing {
     use super::*;
-    use lexer::{Lexer, StrPeeker, TokenKind, Tokenize};
+    use lexer::{Lexer, StrPeeker};
 
     fn parse_statement(src: &str) -> Result<Vec<Stmt>, ParseError> {
         let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
@@ -558,7 +619,7 @@ mod stmt_parsing {
     fn parse_for_statement() {
         let src = "for (1; 2; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), Some(increment), block), .. }) = ast.pop() else {
+        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), Some(increment), _block), .. }) = ast.pop() else {
             panic!("failed to parse For statement.") };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
@@ -569,7 +630,7 @@ mod stmt_parsing {
     fn parse_for_statement_without_initializer() {
         let src = "for (; 2; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(None, Some(condition), Some(increment), block), .. }) = ast.pop() else {
+        let Some(Stmt { kind: StmtKind::For(None, Some(condition), Some(increment), _block), .. }) = ast.pop() else {
             panic!("failed to parse For statement.") };
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
         assert_eq!(increment.kind, ExprKind::Literal(LiteralKind::Num(3.)));
@@ -579,7 +640,7 @@ mod stmt_parsing {
     fn parse_for_statement_without_condition() {
         let src = "for (1; ; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), None, Some(increment), block), .. }) = ast.pop() else {
+        let Some(Stmt { kind: StmtKind::For(Some(initializer), None, Some(increment), _block), .. }) = ast.pop() else {
             panic!("failed to parse For statement.") };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(increment.kind, ExprKind::Literal(LiteralKind::Num(3.)));
@@ -589,7 +650,7 @@ mod stmt_parsing {
     fn parse_for_statement_without_increment() {
         let src = "for (1; 2; ) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), None, block), .. }) = ast.pop() else {
+        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), None, _block), .. }) = ast.pop() else {
             panic!("failed to parse For statement.") };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
@@ -599,7 +660,7 @@ mod stmt_parsing {
     fn parse_naked_for_statement() {
         let src = "for (;;) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(None, None, None, block), .. }) = ast.pop() else {
+        let Some(Stmt { kind: StmtKind::For(None, None, None, _block), .. }) = ast.pop() else {
             panic!("failed to parse For statement.") };
     }
 
@@ -633,7 +694,52 @@ mod stmt_parsing {
             panic!("failed to parse Function declaration statement.") };
         assert_eq!(&name, "foo");
         assert_eq!(args, vec!["a".to_string(), "b".to_string()]);
-        let Some(stmt) = body.pop() else  {
+        let Some(_stmt) = body.pop() else  {
             panic!("Failed to parse function body."); };
+    }
+
+    #[test]
+    fn parse_simple_class_definition() {
+        let src = r#"
+            class foo {}
+        "#;
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Class(name, None, body), .. }) = ast.pop() else {
+            panic!("failed to parse Class declaration statement.") };
+        assert_eq!(&name, "foo");
+        assert!(body.is_empty());
+    }
+
+    #[test]
+    fn parse_class_definition_with_super_class() {
+        let src = r#"
+            class foo < bar {}
+        "#;
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Class(name, Some(super_name), body), .. }) = ast.pop() else {
+            panic!("failed to parse Class declaration statement.") };
+        assert_eq!(&name, "foo");
+        assert_eq!(&super_name, "bar");
+        assert!(body.is_empty());
+    }
+
+    #[test]
+    fn parse_class_definition_with_methods() {
+        let src = r#"
+            class foo {
+                bar() { }
+                baz() { }
+            }
+        "#;
+        let mut ast = parse_statement(src).unwrap();
+        let Some(Stmt { kind: StmtKind::Class(name, None, mut body), .. }) = ast.pop() else {
+            panic!("failed to parse Class declaration statement.") };
+        assert_eq!(&name, "foo");
+        let Some(Stmt { kind: StmtKind::Function(method_name, _args, _fn_body), .. }) = body.pop() else  {
+            panic!("Failed to parse class method."); };
+        assert_eq!(&method_name, "baz");
+        let Some(Stmt { kind: StmtKind::Function(method_name, _args, _fn_body), .. }) = body.pop() else  {
+            panic!("Failed to parse class method."); };
+        assert_eq!(&method_name, "bar");
     }
 }
