@@ -3,5 +3,6 @@ members = [
   "heap",
   "lexer",
   "parser",
+  "resolver",
   "rlox",
 ]

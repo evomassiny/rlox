@@ -39,8 +39,8 @@ impl Tombstone {
 impl Markable for Tombstone {
     /// collect references objects for marking
     fn collect_references(&self, object_ptrs: &mut Vec<ObjectRef>) {
-        /// SAFETY:
-        /// safe because both &self and self.object_ptr are non Null
+        // SAFETY:
+        // safe because both &self and self.object_ptr are non Null
         unsafe {
             let self_ptr = Some(NonNull::new_unchecked(self as *const _ as *mut Header));
             object_ptrs.push(ObjectRef {

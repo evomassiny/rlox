@@ -1,6 +1,14 @@
-use super::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
+use super::ast::{
+    BinaryExprKind, Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, LogicalExprKind,
+    UnaryExprKind,
+};
 use super::cursor::{Cursor, ParseError};
 use lexer::{Token, TokenKind};
+
+// in this file, use simply use
+// strings to represent symbols.
+pub type Expr = GenericExpr<String>;
+pub type ExprKind = GenericExprKind<String>;
 
 /// precedence order
 /// NOTE: higher precedence means less expressions.
@@ -493,8 +501,8 @@ where
 
 #[cfg(test)]
 mod parsing {
-    use super::ExprParser;
-    use crate::ast::{BinaryExprKind, Expr, ExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
+    use super::{Expr, ExprKind, ExprParser};
+    use crate::ast::{BinaryExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
     use crate::cursor::{Cursor, ParseError};
     use lexer::{Lexer, StrPeeker};
 

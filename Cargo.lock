@@ -171,6 +171,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "resolver"
+version = "0.1.0"
+dependencies = [
+ "lexer",
+ "parser",
+]
+
+[[package]]
 name = "rlox"
 version = "0.1.0"
 dependencies = [

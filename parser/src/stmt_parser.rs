@@ -1,7 +1,17 @@
-use super::ast::{Expr, ExprKind, LiteralKind, Stmt, StmtKind};
+use super::ast::{
+    Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, Stmt as GenericStmt,
+    StmtKind as GenericStmtKind,
+};
 use super::cursor::{Cursor, ParseError};
 use super::expr_parser::ExprParser;
 use lexer::{Token, TokenKind, Tokenize};
+
+// in this file, use simply use
+// strings to represent symbols.
+pub type Expr = GenericExpr<String>;
+pub type ExprKind = GenericExprKind<String>;
+pub type Stmt = GenericStmt<String>;
+pub type StmtKind = GenericStmtKind<String>;
 
 /// Parse statements using an explicit recursive
 /// descent parser, and expressions using a Pratt Parser.
@@ -107,8 +117,7 @@ impl<'input> StmtParser<'input> {
 
         // parse next expression
         let expr = self.parse_one_expression()?;
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
 
         match expr {
@@ -230,8 +239,7 @@ impl<'input> StmtParser<'input> {
             let stmt = self.declaration()?;
             statements.push(stmt);
         }
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::RightParen, "Expect '}' after block.")?;
 
         Ok(Stmt {
@@ -271,15 +279,12 @@ impl<'input> StmtParser<'input> {
     {
         // span of the `while` token
         let Token { span, .. } = self.cursor.take_previous()?;
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::LeftParen, "Expected '(' after 'while'.")?;
         let condition_expression = self.parse_one_expression()?;
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::RightBrace, "Expected ')' after 'while'.")?;
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::LeftBrace, "Expected '{' after while condition.")?;
         let stmt = self.block_statement()?;
         Ok(Stmt {
@@ -301,8 +306,7 @@ impl<'input> StmtParser<'input> {
         let mut increment: Option<Box<Expr>> = None;
 
         // parse initializer
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::LeftParen, "Expected '(' after 'for'.")?;
         if !self.cursor.matches(TokenKind::Semicolon)? {
             initializer = Some(Box::new(self.parse_one_expression()?));
@@ -350,8 +354,7 @@ impl<'input> StmtParser<'input> {
 
         // parse following expression
         let expr = self.parse_one_expression()?;
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
 
         Ok(Stmt {
@@ -447,8 +450,7 @@ impl<'input> StmtParser<'input> {
             let stmt = self.declaration()?;
             statements.push(stmt);
         }
-        self
-            .cursor
+        self.cursor
             .consume(TokenKind::RightBrace, "Expected '}' after function body.")?;
         Ok(statements)
     }
