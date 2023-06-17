@@ -11,13 +11,20 @@ const BYTES_BUFFER_SIZE: usize = 1024;
 #[derive(Debug)]
 pub struct ReaderPeeker<T> {
     reader: T,
+    // input read buffer
     bytes: RingBuffer<BYTES_BUFFER_SIZE, u8>,
+    // outout buffer
     chars: RingBuffer<CHARS_BUFFER_SIZE, char>,
+    // scratch array to parse utf-8 chars
     parse_buffer: [u8; PARSE_BUFFER_SIZE],
 }
 
 impl<T: Read> ReaderPeeker<T> {
+    /// parse as must chars from self.reader
+    /// until either `self.chars` if full or we emptied the reader.
     pub fn parse_batch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // copy reader -> self.bytes
+        //                self.bytes -> self.parse_buffer
         // read bytes from file, to fill parse buffer
         if self.bytes.len() < self.parse_buffer.len() {
             let _ = self.bytes.fill(&mut self.reader)?;
@@ -69,11 +76,14 @@ impl<T: Read> ReaderPeeker<T> {
 
 impl<T: Read> PeekOffset for ReaderPeeker<T> {
     fn peek_at(&mut self, n: usize) -> Result<Option<char>, ReadError> {
-        if n >= self.chars.len() {
+        if n >= self.chars.capacity() {
             return Err(ReadError::PeekTooFar);
         }
-        if self.chars.len() < n && self.parse_batch().is_err() {
-            return Err(ReadError::IoError);
+        if n >= self.chars.len() {
+            let res = self.parse_batch();
+            if res.is_err() {
+                return Err(ReadError::IoError);
+            }
         }
         Ok(self.chars.get(n))
     }

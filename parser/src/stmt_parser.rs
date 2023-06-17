@@ -73,7 +73,6 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         let current: &TokenKind = &self.cursor.current()?.kind;
-        dbg!(&current);
         match *current {
             TokenKind::Print => {
                 // position cursor right after `print
@@ -97,6 +96,10 @@ impl<'input> StmtParser<'input> {
             TokenKind::While => {
                 self.cursor.advance()?;
                 self.while_statement()
+            }
+            TokenKind::For => {
+                self.cursor.advance()?;
+                self.for_statement()
             }
             TokenKind::For => {
                 self.cursor.advance()?;

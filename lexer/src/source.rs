@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
 
+#[derive(Debug)]
 pub enum ReadError {
     /// Token buffer is too small to fit that much token,
     PeekTooFar,
@@ -75,13 +76,18 @@ impl<T: PeekOffset> SourceInput<T> {
 
     pub fn peek(&mut self, index: usize) -> Option<char> {
         if let Some(&c) = self.growable_buffer.get(index) {
+            // we asked for a buffered char
             return c;
         }
         // empty stack buffer into heap one,
         // until `index`
-        while index - self.growable_buffer.len() >= self.src.capacity() {
+        // grow the buffer until the requested index can fit
+        // in the [ buffer ] + [ src ]
+        //while index - self.growable_buffer.len() >= self.src.capacity() {
+        while self.src.capacity() + self.growable_buffer.len() <= index {
             self.growable_buffer.push_back(self.src.next());
         }
+
         match self.src.peek_at(index - self.growable_buffer.len()) {
             Ok(maybe_c) => maybe_c,
             Err(ReadError::PeekTooFar) => unreachable!("check for buffer capacity did not work ?"),

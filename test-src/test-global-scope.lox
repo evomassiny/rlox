@@ -1,0 +1,9 @@
+fun fn_a() {
+  fn_b();
+}
+fun fn_b() {
+  print "fn_b";
+}
+
+fn_a();
+

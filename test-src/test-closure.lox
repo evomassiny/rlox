@@ -9,6 +9,6 @@ fun outer() {
   return inner;
 }
 
-var inner = outer();
+var inner = outer() + outer();
 print "must print 'outer'";
 inner();

@@ -1,9 +1,6 @@
 use clap::Parser as ArgParser;
-
-
-
-
 use lexer::{TokenKind, Tokenize};
+use resolver::{resolve_names, Ast};
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -29,7 +26,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lexer = lexer::Lexer::from_path(&args.input)?;
     let mut parser = parser::StmtParser::new(Box::new(lexer));
 
-    let ast = parser.parse();
+    let raw_stmts = parser.parse();
+    println!("raw_stmts: {:?}", raw_stmts);
+
+    let raw_ast = raw_stmts
+        .expect("parsing failed.")
+        .pop()
+        .expect("parsing failed.");
+    let ast = resolve_names(raw_ast);
     println!("ast: {:?}", ast);
 
     Ok(())

@@ -312,6 +312,8 @@ where
                 cursor.advance()?;
             }
         }
+        // consume right parenthesis
+        cursor.advance()?;
         Ok(Expr {
             kind: ExprKind::Call(Box::new(callee), arguments),
             span,
@@ -787,7 +789,6 @@ mod parsing {
         let src = "a.b";
         let expr = parse_expression(src).unwrap();
 
-        dbg!(&expr);
         let ExprKind::Get(instance, attribute) = expr.kind else { panic!("failed to parse Get expression") };
         assert_eq!(instance.kind, ExprKind::Variable("a".to_string()));
         assert_eq!(attribute, "b".to_string());
