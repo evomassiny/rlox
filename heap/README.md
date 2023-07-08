@@ -15,23 +15,22 @@ Here is how it works:
   when we encounter "reference to a new object location",
   we update the refs of the objects so they point to the relocated one.
 
-The step of relocating objects from fragemented blocks into other ones is called `evacuation`.
+The step of relocating objects from fragmented blocks into other ones is called `evacuation`.
 
 To estimate the fragmentation of each block, we divide it into `lines` of 128 bits, 
 and mark them when they contain live objects.
 
 # About Blocks
 
-Heap allocates memory by `Block`s, a block contain:
+Heap allocates memory by `Blocks`, a block contains:
  * a bunch of live objects (Buffers, Numbers, ...), sparsely located in the block memory,
  * a `BlockHeader` that describes how "full" a block is.
 
-`BlockHeader`s are located on the very start of each block,
-and `Block`s are **aligned on their size**.
+`BlockHeaders` are located on the very start of each block,
+and `Blocks` are **aligned on their size**.
 
 This makes it trivial to obtain the address of the `BlockHeader` 
-related to the `Block` where an object is allocated
-from the object address (by filtering out the lower bits of the
+related to a managed object, by using the object address (by filtering out the lower bits of the
 object address).
 
 This implementation relies (a lot) on this property.

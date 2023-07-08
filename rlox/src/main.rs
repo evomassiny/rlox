@@ -29,10 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let raw_stmts = parser.parse();
     println!("raw_stmts: {:?}", raw_stmts);
 
-    let raw_ast = raw_stmts
-        .expect("parsing failed.")
-        .pop()
-        .expect("parsing failed.");
+    // TODO: print a proper error message
+    let raw_ast = raw_stmts.expect("parsing failed.");
     let ast = resolve_names(raw_ast);
     println!("ast: {:?}", ast);
 

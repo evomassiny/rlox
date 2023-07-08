@@ -4,8 +4,8 @@ use std::ops::{Index, IndexMut};
 /// Represents a variable binding
 #[derive(Debug)]
 pub struct Symbol {
-    name: String,
-    src: Span,
+    pub name: String,
+    pub src: Span,
 }
 
 pub type SymbolId = usize;
@@ -44,9 +44,23 @@ impl Index<SymbolId> for SymbolTable {
         &self.symbols[index]
     }
 }
-
 impl IndexMut<SymbolId> for SymbolTable {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+    fn index_mut(&mut self, index: SymbolId) -> &mut Self::Output {
         &mut self.symbols[index]
     }
 }
+
+impl Index<&SymbolId> for SymbolTable {
+    type Output = Symbol;
+
+    fn index(&self, index: &SymbolId) -> &Self::Output {
+        &self.symbols[*index]
+    }
+}
+
+impl IndexMut<&SymbolId> for SymbolTable {
+    fn index_mut(&mut self, index: &SymbolId) -> &mut Self::Output {
+        &mut self.symbols[*index]
+    }
+}
+
