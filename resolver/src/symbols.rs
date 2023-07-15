@@ -10,6 +10,17 @@ pub struct Symbol {
 
 pub type SymbolId = usize;
 
+/// either a direct
+/// reference to a given location, or an alternation between
+/// several variants.
+#[derive(Debug)]
+pub enum Sym {
+    // ref a know location in memory
+    Direct(SymbolId),
+    // Globals ! depend of callsite
+    OneOf(Box<[SymbolId]>),
+}
+
 /// A table of Symbol,
 /// indexable by a `SymbolId`
 #[derive(Debug)]
@@ -63,4 +74,3 @@ impl IndexMut<&SymbolId> for SymbolTable {
         &mut self.symbols[*index]
     }
 }
-

@@ -1,129 +1,104 @@
-use super::symbols::{Symbol, SymbolId, SymbolTable};
+use super::scopes::{Globals, ScopeChain};
+use super::symbols::{Sym, Symbol, SymbolId, SymbolTable};
 use lexer::Span;
 use parser::{Expr, ExprKind, Stmt, StmtKind};
-use std::collections::HashMap;
 
 #[derive(Debug)]
-pub enum NameError {}
+pub enum NameError {
+    /// happens when a symbol has been redined twice in the same scope.
+    RedefinitionError(String, Span, Span),
+    UnboundedVariable(String, Span),
+}
 
 #[derive(Debug)]
 pub struct Ast {
-    root: Stmt<SymbolId>,
+    roots: Vec<Stmt<Sym>>,
     symbols: SymbolTable,
 }
 
-pub struct Scope {
-    // in a non-global scope,
-    // the redefinition of a variable is not allowed,
-    // so we don't need to store multiple variables
-    // per name.
-    symbols: HashMap<String, SymbolId>,
-}
-impl Scope {
-    pub fn new() -> Self {
-        Self { symbols: HashMap::new() }
+fn resolve_block_stmt<'table>(
+    stmts: Vec<Stmt<String>>,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    chain.push_scope();
+    let mut block_stmts: Vec<Stmt<Sym>> = Vec::new();
+    for in_body_stmt in stmts {
+        block_stmts.push(resolve_lexical_scope(in_body_stmt, chain)?);
     }
-
-    pub fn add(&mut self, name: String, src: Span, table: &mut SymbolTable) -> SymbolId {
-        let id = table.add(name.clone(), src);
-        self.symbols.insert(name, id);
-        id
-    }
-    pub fn resolve(&self, name: &str) -> Option<SymbolId> {
-        self.symbols.get(name).copied()
-    }
+    chain.pop_scope();
+    Ok(StmtKind::Block(block_stmts))
 }
 
-pub struct ScopeChain {
-    chain: Vec<Scope>,
+fn resolve_class_stmt<'table>(
+    name: String,
+    super_name: Option<String>,
+    methods: Vec<Stmt<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    let name: Sym = chain.add(name, src.clone());
+    let super_name = match super_name {
+        Some(super_name) => match chain.resolve(&super_name) {
+            Some(super_name) => Some(super_name),
+            None => return Err(NameError::UnboundedVariable(super_name, src.clone())),
+        },
+        None => None,
+    };
+
+    let mut out_methods: Vec<Stmt<Sym>> = Vec::new();
+    for method in methods {
+        out_methods.push(resolve_lexical_scope(method, chain)?);
+    }
+    chain.pop_scope();
+    Ok(StmtKind::Class(name, super_name, out_methods))
 }
-impl ScopeChain {
-    pub fn new() -> Self {
-        Self { chain: Vec::new() }
-    }
 
-    pub fn push_scope(&mut self) {
-        self.chain.push(Scope::new());
-    }
-
-    pub fn pop_scope(&mut self) {
-        let _ = self.chain.pop();
-    }
-
-    pub fn add(&mut self, name: String, src: Span, table: &mut SymbolTable) -> SymbolId {
-        let symbol_id =  match self.chain.last_mut() {
-            Some(scope) => scope.add(name, src, table),
-            None => unreachable!("Can't append a "),
-        };
-        symbol_id
-    }
-
-    pub fn resolve(&self, name: &str) -> Option<SymbolId> {
-        let mut scope_idx = self.chain.len() -1;
-        while scope_idx >= 0 {
-
-            if let Some(id) = self.chain[scope_idx].resolve(name) {
-                return Some(id);
-            }
-            scope_idx -= 1;
+/// recursively traverse the AST starting from `in_stmt`,
+/// and resolve variable names along the way.
+fn resolve_lexical_scope<'table>(
+    in_stmt: Stmt<String>,
+    chain: &mut ScopeChain<'table>,
+) -> Result<Stmt<Sym>, NameError> {
+    use StmtKind::*;
+    let out_kind: StmtKind<Sym> = match in_stmt.kind {
+        Block(stmts) => resolve_block_stmt(stmts, chain)?,
+        Class(name, maybe_super_name, methods) => {
+            resolve_class_stmt(name, maybe_super_name, methods, &in_stmt.span, chain)?
         }
-        None
-    }
-
+        If(condition, then, maybe_else) => todo!(),
+        Function(name, args, body) => todo!(),
+        Expr(expr) => todo!(),
+        Print(expr) => todo!(),
+        Return(maybe_expr) => todo!(),
+        Var(name, intializer) => todo!(),
+        While(condition, body) => todo!(),
+        For(maybe_initializer, maybe_condition, maybe_increment, body) => todo!(),
+    };
+    Ok(Stmt {
+        kind: out_kind,
+        span: in_stmt.span,
+    })
 }
 
-/// Resolution of globals is trickier than it seems,
-/// consider the following:
-/// ```lox
-/// fun foo() { bar(); }
-/// fun bar() { print "first"; }
-/// foo();
-/// fun bar() { print "second"; }
-/// foo();
-/// ```
-/// the 2 invokations of `foo()` won't lead to the same
-/// `bar()` call.
-/// Said otherwise, the resolution of a global variable depends of
-/// the callsite.
-/// This is why we need to store them separetly.
-pub struct Globals {
-    /// redefinition is allowed in globals,
-    pub symbols: HashMap<String, Vec<SymbolId>>,
-}
-impl Globals {
-    pub fn new() -> Self {
-        Self { symbols: HashMap::new() }
-    }
-
-    /// register a global (alongside its span)
-    pub fn add(&mut self, name: String, src: Span, table: &mut SymbolTable) -> SymbolId {
-        let symbol_id = table.add(name.clone(), src);
-
-        self.symbols.entry(name)
-            .or_insert_with(Vec::<SymbolId>::new)
-            .push(symbol_id);
-        symbol_id
-    }
-
-    /// lookup for the last global variable
-    /// named `name` defined before `src`.
-    pub fn resolve(&self, name: &str, src: &Span, table: &SymbolTable) -> Option<SymbolId> {
-        let mut last: Option<SymbolId> = None;
-        if let Some(globals) = self.symbols.get(name) {
-            for global_id in globals {
-                if table[global_id].src.line > src.line {
-                    return last;
-                }
-                last = Some(*global_id);
+/// Resolve all globals from the top ast node
+fn resolve_globals(in_ast: &Vec<Stmt<String>>, symbols: &mut SymbolTable) -> Globals {
+    let mut globals = Globals::new();
+    use StmtKind::*;
+    for stmt in in_ast {
+        match stmt.kind {
+            Class(ref name, ..) => {
+                globals.add(name.clone(), stmt.span.clone(), symbols);
             }
+            Function(ref name, ..) => {
+                globals.add(name.clone(), stmt.span.clone(), symbols);
+            }
+            Var(ref name, ..) => {
+                globals.add(name.clone(), stmt.span.clone(), symbols);
+            }
+            _ => continue,
         }
-        last
     }
-}
-
-
-fn resolve_names_in_stmt(in_stmts: Stmt<String>, scopes: ScopeChain) -> Result<Stmt<SymbolId>, NameError> {
-    todo!()
+    globals
 }
 
 /// traverse the input Abstract Syntax Tree,
@@ -135,29 +110,20 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
     // Traverse the AST in 2 passes:
     // * do a quick shallow pass, to locate globals
     // * do a real traversal, resolving everything
-    
+
     let mut symbols = SymbolTable::new();
 
     // 1. resolve globals
-    let mut globals = Globals::new();
-    for stmt in &in_ast {
-        match stmt.kind {
-            StmtKind::Class(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), &mut symbols);
-            }
-            StmtKind::Function(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), &mut symbols);
-            }
-            StmtKind::Var(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), &mut symbols);
-            }
-            _ => continue
-        }
-    }
+    let globals = resolve_globals(&in_ast, &mut symbols);
     dbg!(&globals.symbols);
 
-    // TODO:
-    // Traverse the AST and maintains some kind lexical scope chain,
-    // eg: a linked list of HashMap<String, SymbolId>
+    // 2. perform a pre-order tree traversal, and maintains some kind of lexical scope chain,
+    let mut chain = ScopeChain::new(globals, &mut symbols);
+    let mut out_stmts: Vec<Stmt<Sym>> = Vec::new();
+    for stmt in in_ast {
+        let stmt = resolve_lexical_scope(stmt, &mut chain)?;
+        out_stmts.push(stmt);
+    }
+
     todo!()
 }

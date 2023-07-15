@@ -1,5 +1,6 @@
 use clap::Parser as ArgParser;
-use lexer::{TokenKind, Tokenize};
+use lexer::{Lexer, TokenKind, Tokenize};
+use parser::{ParseError, StmtParser};
 use resolver::{resolve_names, Ast};
 
 /// Command line arguments
@@ -9,29 +10,60 @@ struct Args {
     /// Path to a lox file
     #[clap(short, long, value_parser)]
     input: String,
+
+    /// print the tokens
+    #[clap(long, value_parser)]
+    print_tokens: bool,
+
+    /// print AST, before name resolution
+    #[clap(long, value_parser)]
+    print_raw_ast: bool,
+}
+
+/// parse and print tokens.
+fn print_tokens(src_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // build a scanner
+    let mut lexer = Lexer::from_path(src_path)?;
+    while let Ok(t) = lexer.scan_next() {
+        println!("{:?}", &t);
+        if matches!(t.kind, TokenKind::Eof) {
+            break;
+        };
+    }
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    // build a scanner
-    let mut lexer = lexer::Lexer::from_path(&args.input)?;
-    while let Ok(t) = lexer.scan_next() {
-        println!("token: {:?}", &t);
-        if matches!(t.kind, TokenKind::Eof) {
-            break;
-        };
+    if args.print_tokens {
+        print_tokens(&args.input)?;
     }
 
-    let lexer = lexer::Lexer::from_path(&args.input)?;
-    let mut parser = parser::StmtParser::new(Box::new(lexer));
+    let lexer = Lexer::from_path(&args.input)?;
+    let mut parser = StmtParser::new(Box::new(lexer));
 
-    let raw_stmts = parser.parse();
-    println!("raw_stmts: {:?}", raw_stmts);
+    // TODO:
+    // return span location,
+    // and print it the source context.
+    let raw_stmts = match parser.parse() {
+        Ok(stmts) => stmts,
+        Err(error) => match error {
+            ParseError::ExpectedToken(msg) => panic!("Missing token {:?}", msg),
+            ParseError::ScanningError(e) => panic!("Lexing error {:?}", e),
+            ParseError::ExpectedExpression(msg) => panic!("missing expression: {:?}", msg),
+            ParseError::Starved => panic!("File ended too soon !"),
+        },
+    };
+
+    if args.print_raw_ast {
+        for stmt in &raw_stmts {
+            println!("{:?}", &stmt);
+        }
+    }
 
     // TODO: print a proper error message
-    let raw_ast = raw_stmts.expect("parsing failed.");
-    let ast = resolve_names(raw_ast);
+    let ast = resolve_names(raw_stmts);
     println!("ast: {:?}", ast);
 
     Ok(())
