@@ -53,6 +53,56 @@ fn resolve_class_stmt<'table>(
     Ok(StmtKind::Class(name, super_name, out_methods))
 }
 
+/// register the new variable binding,
+/// and validate the initializer expression
+fn resolve_var_stmt<'table>(
+    name: String,
+    intializer: Box<Expr<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    // validate intializer expression
+    let initializer_expr: Box<Expr<Sym>> = resolve_expression(intializer, src, chain)?;
+
+    // register binding
+    let name: Sym = chain.add(name, src.clone());
+
+    Ok(StmtKind::Var(name, initializer_expr))
+}
+
+/// validate expression names
+/// in an expression statement.
+fn resolve_expr_stmt<'table>(
+    in_expr: Box<Expr<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    use ExprKind::*;
+
+    let out_expr: Box<Expr<Sym>> = resolve_expression(in_expr, src, chain)?;
+    Ok(StmtKind::Expr(out_expr))
+}
+
+/// validate expression names
+fn resolve_expression<'table>(
+    in_expr: Box<Expr<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<Box<Expr<Sym>>, NameError> {
+    use ExprKind::*;
+
+    dbg!(&in_expr.kind);
+    let out_kind: ExprKind<Sym> = match in_expr.kind {
+        Literal(literal_kind) => Literal(literal_kind),
+        _ => todo!(),
+    };
+    let out_expr = Expr {
+        kind: out_kind,
+        span: in_expr.span,
+    };
+    Ok(Box::new(out_expr))
+}
+
 /// recursively traverse the AST starting from `in_stmt`,
 /// and resolve variable names along the way.
 fn resolve_lexical_scope<'table>(
@@ -67,10 +117,10 @@ fn resolve_lexical_scope<'table>(
         }
         If(condition, then, maybe_else) => todo!(),
         Function(name, args, body) => todo!(),
-        Expr(expr) => todo!(),
+        Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
         Print(expr) => todo!(),
         Return(maybe_expr) => todo!(),
-        Var(name, intializer) => todo!(),
+        Var(name, intializer) => resolve_var_stmt(name, intializer, &in_stmt.span, chain)?,
         While(condition, body) => todo!(),
         For(maybe_initializer, maybe_condition, maybe_increment, body) => todo!(),
     };
@@ -117,7 +167,9 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
     let globals = resolve_globals(&in_ast, &mut symbols);
     dbg!(&globals.symbols);
 
-    // 2. perform a pre-order tree traversal, and maintains some kind of lexical scope chain,
+    // 2. perform a pre-order tree traversal,
+    // and maintains some kind of lexical scope chain,
+    // during the traversal, we update `symbols`
     let mut chain = ScopeChain::new(globals, &mut symbols);
     let mut out_stmts: Vec<Stmt<Sym>> = Vec::new();
     for stmt in in_ast {
@@ -125,5 +177,9 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
         out_stmts.push(stmt);
     }
 
-    todo!()
+    // 3. gather outputs
+    Ok(Ast {
+        roots: out_stmts,
+        symbols,
+    })
 }

@@ -114,8 +114,16 @@ impl<'table> ScopeChain<'table> {
 
     pub fn add(&mut self, name: String, src: Span) -> Sym {
         let symbol_id = match self.chain.last_mut() {
+            // inner scope
             Some(scope) => scope.add(name, src, self.symbols),
-            None => unreachable!("Can't append a "),
+            // We could append the binding directly into the global scope,
+            // _but_ it should have been previously resolved.
+            None => match self.globals.resolve_precise(&name, &src, self.symbols) {
+                Some(symbol_id) => symbol_id,
+                None => {
+                    unreachable!("the global binding '{name}' should have already been resolved")
+                }
+            },
         };
         Sym::Direct(symbol_id)
     }
