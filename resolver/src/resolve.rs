@@ -70,6 +70,16 @@ fn resolve_var_stmt<'table>(
     Ok(StmtKind::Var(name, initializer_expr))
 }
 
+/// resolve the expression being printed
+fn resolve_print_stmt<'table>(
+    in_expr: Box<Expr<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    let out_expr: Box<Expr<Sym>> = resolve_expression(in_expr, src, chain)?;
+    Ok(StmtKind::Print(out_expr))
+}
+
 /// validate expression names
 /// in an expression statement.
 fn resolve_expr_stmt<'table>(
@@ -91,10 +101,53 @@ fn resolve_expression<'table>(
 ) -> Result<Box<Expr<Sym>>, NameError> {
     use ExprKind::*;
 
-    dbg!(&in_expr.kind);
     let out_kind: ExprKind<Sym> = match in_expr.kind {
         Literal(literal_kind) => Literal(literal_kind),
-        _ => todo!(),
+        Unary(kind, inner_expr) => {
+            let inner_out_expr = resolve_expression(inner_expr, src, chain)?;
+            ExprKind::Unary(kind, inner_out_expr)
+        }
+        Binary(left_expr, kind, right_expr) => {
+            let left_out_expr = resolve_expression(left_expr, src, chain)?;
+            let right_out_expr = resolve_expression(right_expr, src, chain)?;
+            ExprKind::Binary(left_out_expr, kind, right_out_expr)
+        }
+        Logical(left_expr, kind, right_expr) => {
+            let left_out_expr = resolve_expression(left_expr, src, chain)?;
+            let right_out_expr = resolve_expression(right_expr, src, chain)?;
+            ExprKind::Logical(left_out_expr, kind, right_out_expr)
+        }
+        Grouping(inner_expr) => {
+            let inner_out_expr = resolve_expression(inner_expr, src, chain)?;
+            ExprKind::Grouping(inner_out_expr)
+        }
+        Call(callee_expr, args) => {
+            let callee = resolve_expression(callee_expr, src, chain)?;
+            let mut out_args = Vec::with_capacity(args.len());
+            for in_arg in args {
+                out_args.push(*resolve_expression(Box::new(in_arg), src, chain)?);
+            }
+            ExprKind::Call(callee, out_args)
+        }
+        Assign(bind_name, r_value_expr) => {
+            let symbol_id = match chain.resolve(&bind_name) {
+                Some(symbol_id) => symbol_id,
+                None => return Err(NameError::UnboundedVariable(bind_name, src.clone())),
+            };
+            let r_value_expr = resolve_expression(r_value_expr, src, chain)?;
+            ExprKind::Assign(symbol_id, r_value_expr)
+        }
+        Variable(bind_name) => {
+            let symbol_id = match chain.resolve(&bind_name) {
+                Some(symbol_id) => symbol_id,
+                None => return Err(NameError::UnboundedVariable(bind_name, src.clone())),
+            };
+            ExprKind::Variable(symbol_id)
+        }
+        Get(object_expr, attr_name) => todo!(),
+        Set(object_expr, attr_name, r_value_expr) => todo!(),
+        Super(attr_name) => todo!(),
+        This => todo!(),
     };
     let out_expr = Expr {
         kind: out_kind,
@@ -118,7 +171,7 @@ fn resolve_lexical_scope<'table>(
         If(condition, then, maybe_else) => todo!(),
         Function(name, args, body) => todo!(),
         Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
-        Print(expr) => todo!(),
+        Print(expr) => resolve_print_stmt(expr, &in_stmt.span, chain)?,
         Return(maybe_expr) => todo!(),
         Var(name, intializer) => resolve_var_stmt(name, intializer, &in_stmt.span, chain)?,
         While(condition, body) => todo!(),

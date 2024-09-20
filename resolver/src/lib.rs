@@ -4,6 +4,6 @@ mod resolve;
 mod scopes;
 mod symbols;
 
-pub use resolve::{resolve_names, Ast};
+pub use resolve::{resolve_names, Ast, NameError};
 use scopes::{Globals, ScopeChain};
 pub use symbols::{Symbol, SymbolId};

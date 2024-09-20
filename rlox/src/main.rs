@@ -1,7 +1,7 @@
 use clap::Parser as ArgParser;
 use lexer::{Lexer, TokenKind, Tokenize};
 use parser::{ParseError, StmtParser};
-use resolver::{resolve_names, Ast};
+use resolver::{resolve_names, Ast, NameError};
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -63,7 +63,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // TODO: print a proper error message
-    let ast = resolve_names(raw_stmts);
+    let ast = match resolve_names(raw_stmts) {
+        Ok(ast) => ast,
+        Err(NameError::RedefinitionError(name, src_a, src_b)) => panic!(
+            "'{name}' defined twice, at l.{0} and l.{1}",
+            src_a.line, src_b.line
+        ),
+        Err(NameError::UnboundedVariable(name, src)) => {
+            panic!("undefined variable '{name}', at l.{0}", src.line)
+        }
+    };
     println!("ast: {:?}", ast);
 
     Ok(())
