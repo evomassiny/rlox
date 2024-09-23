@@ -53,6 +53,85 @@ fn resolve_class_stmt<'table>(
     Ok(StmtKind::Class(name, super_name, out_methods))
 }
 
+/// resolve the condition expression,
+/// and the two branches (then/else) independantly
+fn resolve_if_stmt<'table>(
+    condition: Box<Expr<String>>,
+    then_branch: Box<Stmt<String>>,
+    maybe_else_branch: Option<Box<Stmt<String>>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    // validate the condition expression
+    let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
+    // validate the "then" branch,
+    // we need to introduce a new scope, otherwise a variable defined in the
+    // "then" branch could be used in the "else" one.
+    chain.push_scope();
+    let then_branch: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*then_branch, chain)?);
+    chain.pop_scope();
+    // validate "else" branch
+    let maybe_else_branch: Option<Box<Stmt<Sym>>> = match maybe_else_branch {
+        Some(else_branch) => {
+            chain.push_scope();
+            let else_branch = Box::new(resolve_lexical_scope(*else_branch, chain)?);
+            chain.pop_scope();
+            Some(else_branch)
+        }
+        None => None,
+    };
+    Ok(StmtKind::If(condition, then_branch, maybe_else_branch))
+}
+
+/// resolve the bindings in a While statement
+fn resolve_while_stmt<'table>(
+    condition: Box<Expr<String>>,
+    body: Box<Stmt<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    // validate the condition expression
+    let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
+    // validate body statement
+    chain.push_scope();
+    let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
+    chain.pop_scope();
+    Ok(StmtKind::While(condition, body))
+}
+/// resolve the bindings in a For statement
+fn resolve_for_stmt<'table>(
+    maybe_initializer: Option<Box<Expr<String>>>,
+    maybe_condition: Option<Box<Expr<String>>>,
+    maybe_increment: Option<Box<Expr<String>>>,
+    body: Box<Stmt<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    // validate "for(initializer, condition, increment)"
+    let maybe_initializer: Option<Box<Expr<Sym>>> = match maybe_initializer {
+        Some(initializer) => Some(resolve_expression(initializer, src, chain)?),
+        None => None,
+    };
+    let maybe_condition: Option<Box<Expr<Sym>>> = match maybe_condition {
+        Some(condition) => Some(resolve_expression(condition, src, chain)?),
+        None => None,
+    };
+    let maybe_increment: Option<Box<Expr<Sym>>> = match maybe_increment {
+        Some(increment) => Some(resolve_expression(increment, src, chain)?),
+        None => None,
+    };
+
+    // validate for body
+    chain.push_scope();
+    let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
+    chain.pop_scope();
+    Ok(StmtKind::For(
+        maybe_initializer,
+        maybe_condition,
+        maybe_increment,
+        body,
+    ))
+}
 /// register the new variable binding,
 /// and validate the initializer expression
 fn resolve_var_stmt<'table>(
@@ -80,6 +159,19 @@ fn resolve_print_stmt<'table>(
     Ok(StmtKind::Print(out_expr))
 }
 
+/// resolve the expression being returned
+fn resolve_return_stmt<'table>(
+    maybe_expr: Option<Box<Expr<String>>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    let maybe_expression: Option<Box<Expr<Sym>>> = match maybe_expr {
+        Some(expr) => Some(resolve_expression(expr, src, chain)?),
+        None => None,
+    };
+    Ok(StmtKind::Return(maybe_expression))
+}
+
 /// validate expression names
 /// in an expression statement.
 fn resolve_expr_stmt<'table>(
@@ -100,6 +192,8 @@ fn resolve_expression<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<Box<Expr<Sym>>, NameError> {
     use ExprKind::*;
+    // TODO:
+    // use an explicit stack for recursion instead of the stackframe
 
     let out_kind: ExprKind<Sym> = match in_expr.kind {
         Literal(literal_kind) => Literal(literal_kind),
@@ -168,14 +262,23 @@ fn resolve_lexical_scope<'table>(
         Class(name, maybe_super_name, methods) => {
             resolve_class_stmt(name, maybe_super_name, methods, &in_stmt.span, chain)?
         }
-        If(condition, then, maybe_else) => todo!(),
+        If(condition, then, maybe_else) => {
+            resolve_if_stmt(condition, then, maybe_else, &in_stmt.span, chain)?
+        }
         Function(name, args, body) => todo!(),
         Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
         Print(expr) => resolve_print_stmt(expr, &in_stmt.span, chain)?,
-        Return(maybe_expr) => todo!(),
+        Return(maybe_expr) => resolve_return_stmt(maybe_expr, &in_stmt.span, chain)?,
         Var(name, intializer) => resolve_var_stmt(name, intializer, &in_stmt.span, chain)?,
-        While(condition, body) => todo!(),
-        For(maybe_initializer, maybe_condition, maybe_increment, body) => todo!(),
+        While(condition, body) => resolve_while_stmt(condition, body, &in_stmt.span, chain)?,
+        For(maybe_initializer, maybe_condition, maybe_increment, body) => resolve_for_stmt(
+            maybe_initializer,
+            maybe_condition,
+            maybe_increment,
+            body,
+            &in_stmt.span,
+            chain,
+        )?,
     };
     Ok(Stmt {
         kind: out_kind,

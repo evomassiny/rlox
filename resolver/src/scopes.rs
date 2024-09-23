@@ -1,6 +1,5 @@
 use super::symbols::{Sym, SymbolId, SymbolTable};
 use lexer::Span;
-use parser::{Expr, ExprKind, Stmt, StmtKind};
 use std::collections::HashMap;
 
 /// Resolution of globals is trickier than it seems,
@@ -130,13 +129,9 @@ impl<'table> ScopeChain<'table> {
 
     pub fn resolve(&self, name: &str) -> Option<Sym> {
         // first lookup in the lexical scope chain
-        if self.chain.len() > 0 {
-            let mut scope_idx = self.chain.len() - 1;
-            while scope_idx >= 0 {
-                if let Some(id) = self.chain[scope_idx].resolve(name) {
-                    return Some(Sym::Direct(id));
-                }
-                scope_idx -= 1;
+        for scope_idx in (0..self.chain.len()).rev() {
+            if let Some(id) = self.chain[scope_idx].resolve(name) {
+                return Some(Sym::Direct(id));
             }
         }
         // fallback to globals
