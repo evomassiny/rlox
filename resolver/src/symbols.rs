@@ -1,11 +1,32 @@
 use lexer::Span;
 use std::ops::{Index, IndexMut};
 
+/// represents how a value should be
+/// stored in memory
+#[derive(Debug, PartialEq, Eq)]
+pub enum StorageKind {
+    /// includes functions locals and globals
+    StackLocal,
+    /// function locals captured by closures
+    UpValue,
+    // TODO: what about object attributes ?
+}
+
 /// Represents a variable binding
 #[derive(Debug)]
 pub struct Symbol {
+    /// name of the variable (how it's been declared)
     pub name: String,
+    /// where it's been declared
     pub src: Span,
+    /// how we should store it
+    pub storage_kind: StorageKind,
+}
+
+impl Symbol {
+    pub fn promote_as_upvalue(&mut self) {
+        self.storage_kind = StorageKind::UpValue;
+    }
 }
 
 pub type SymbolId = usize;
@@ -21,7 +42,7 @@ pub enum Sym {
     OneOf(Box<[SymbolId]>),
 }
 
-/// A table of Symbol,
+/// A table of Symbols,
 /// indexable by a `SymbolId`
 #[derive(Debug)]
 pub struct SymbolTable {
@@ -42,7 +63,11 @@ impl SymbolTable {
     /// and returns its ID
     pub fn add(&mut self, name: String, src: Span) -> SymbolId {
         let id = self.symbols.len();
-        let symbol = Symbol { name, src };
+        let symbol = Symbol {
+            name,
+            src,
+            storage_kind: StorageKind::StackLocal,
+        };
         self.symbols.push(symbol);
         id
     }

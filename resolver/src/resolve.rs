@@ -1,4 +1,4 @@
-use super::scopes::{Globals, ScopeChain};
+use super::scopes::{Globals, ScopeChain, ScopeKind};
 use super::symbols::{Sym, Symbol, SymbolId, SymbolTable};
 use lexer::Span;
 use parser::{Expr, ExprKind, Stmt, StmtKind};
@@ -20,7 +20,7 @@ fn resolve_block_stmt<'table>(
     stmts: Vec<Stmt<String>>,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
-    chain.push_scope();
+    chain.push_scope(ScopeKind::Block);
     let mut block_stmts: Vec<Stmt<Sym>> = Vec::new();
     for in_body_stmt in stmts {
         block_stmts.push(resolve_lexical_scope(in_body_stmt, chain)?);
@@ -37,6 +37,8 @@ fn resolve_class_stmt<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
     let name: Sym = chain.add(name, src.clone());
+    chain.push_scope(ScopeKind::ClassDecl);
+
     let super_name = match super_name {
         Some(super_name) => match chain.resolve(&super_name) {
             Some(super_name) => Some(super_name),
@@ -53,6 +55,34 @@ fn resolve_class_stmt<'table>(
     Ok(StmtKind::Class(name, super_name, out_methods))
 }
 
+fn resolve_fun_stmt<'table>(
+    name: String,
+    args: Vec<String>,
+    body: Vec<Stmt<String>>,
+    src: &Span,
+    chain: &mut ScopeChain<'table>,
+) -> Result<StmtKind<Sym>, NameError> {
+    // add function name binding to parent scope
+    let name: Sym = chain.add(name, src.clone());
+
+    chain.push_scope(ScopeKind::FunDecl);
+
+    // add argument bindings to function scope
+    let mut arg_ids = Vec::new();
+    for arg_name in args {
+        arg_ids.push(chain.add(arg_name, src.clone()));
+    }
+
+    // resolve body statements
+    let mut resolved_stmts = Vec::new();
+    for stmt in body {
+        resolved_stmts.push(resolve_lexical_scope(stmt, chain)?);
+    }
+
+    chain.pop_scope();
+    Ok(StmtKind::Function(name, arg_ids, resolved_stmts))
+}
+
 /// resolve the condition expression,
 /// and the two branches (then/else) independantly
 fn resolve_if_stmt<'table>(
@@ -67,13 +97,13 @@ fn resolve_if_stmt<'table>(
     // validate the "then" branch,
     // we need to introduce a new scope, otherwise a variable defined in the
     // "then" branch could be used in the "else" one.
-    chain.push_scope();
+    chain.push_scope(ScopeKind::Block);
     let then_branch: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*then_branch, chain)?);
     chain.pop_scope();
     // validate "else" branch
     let maybe_else_branch: Option<Box<Stmt<Sym>>> = match maybe_else_branch {
         Some(else_branch) => {
-            chain.push_scope();
+            chain.push_scope(ScopeKind::Block);
             let else_branch = Box::new(resolve_lexical_scope(*else_branch, chain)?);
             chain.pop_scope();
             Some(else_branch)
@@ -93,7 +123,7 @@ fn resolve_while_stmt<'table>(
     // validate the condition expression
     let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
     // validate body statement
-    chain.push_scope();
+    chain.push_scope(ScopeKind::Block);
     let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::While(condition, body))
@@ -122,7 +152,7 @@ fn resolve_for_stmt<'table>(
     };
 
     // validate for body
-    chain.push_scope();
+    chain.push_scope(ScopeKind::Block);
     let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::For(
@@ -265,7 +295,7 @@ fn resolve_lexical_scope<'table>(
         If(condition, then, maybe_else) => {
             resolve_if_stmt(condition, then, maybe_else, &in_stmt.span, chain)?
         }
-        Function(name, args, body) => todo!(),
+        Function(name, args, body) => resolve_fun_stmt(name, args, body, &in_stmt.span, chain)?,
         Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
         Print(expr) => resolve_print_stmt(expr, &in_stmt.span, chain)?,
         Return(maybe_expr) => resolve_return_stmt(maybe_expr, &in_stmt.span, chain)?,
