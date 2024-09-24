@@ -12,8 +12,8 @@ pub enum NameError {
 
 #[derive(Debug)]
 pub struct Ast {
-    roots: Vec<Stmt<Sym>>,
-    symbols: SymbolTable,
+    pub roots: Vec<Stmt<Sym>>,
+    pub symbols: SymbolTable,
 }
 
 fn resolve_block_stmt<'table>(
@@ -351,7 +351,6 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
 
     // 1. resolve globals
     let globals = resolve_globals(&in_ast, &mut symbols);
-    dbg!(&globals.symbols);
 
     // 2. perform a pre-order tree traversal,
     // and maintains some kind of lexical scope chain,

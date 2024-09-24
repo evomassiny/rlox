@@ -1,14 +1,16 @@
-var x = "global";
-
 fun outer() {
-  var x = "outer";
-  fun inner() {
-    print x;
+  var upvalue = "outer";
+  var stack_local = "whatever";
+  print stack_local;
+
+  fun closure() {
+    print upvalue;
   }
 
-  return inner;
+  return closure;
 }
 
-var inner = outer() + outer();
+var inner = outer();
+
 print "must print 'outer'";
 inner();

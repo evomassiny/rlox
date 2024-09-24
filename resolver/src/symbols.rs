@@ -71,6 +71,10 @@ impl SymbolTable {
         self.symbols.push(symbol);
         id
     }
+
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
 }
 
 impl Index<SymbolId> for SymbolTable {

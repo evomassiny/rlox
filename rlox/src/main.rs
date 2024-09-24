@@ -73,7 +73,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             panic!("undefined variable '{name}', at l.{0}", src.line)
         }
     };
-    println!("ast: {:?}", ast);
+    println!("ast: {:?}\n", ast);
+
+    for symbol_idx in 0..ast.symbols.len() {
+        let symbol = &ast.symbols[symbol_idx];
+        println!("{0}: {2:?} (l.{1})", symbol.name, symbol.src.line, symbol.storage_kind);
+    }
 
     Ok(())
 }

@@ -163,9 +163,11 @@ impl<'table> ScopeChain<'table> {
                 // and the cureent usage.
                 // If we found one, this means we're dealing with an
                 // upvalue, eg: a variable captured by a closure.
-                for i in scope_idx..self.chain.len() {
-                    if self.chain[i].kind == ScopeKind::FunDecl {
-                        self.symbols[symbol_id].promote_as_upvalue();
+                if scope_idx != self.chain.len() - 1 {
+                    for i in (scope_idx + 1)..self.chain.len() {
+                        if self.chain[i].kind == ScopeKind::FunDecl {
+                            self.symbols[symbol_id].promote_as_upvalue();
+                        }
                     }
                 }
                 return Some(Sym::Direct(symbol_id));
