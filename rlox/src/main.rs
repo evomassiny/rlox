@@ -2,6 +2,7 @@ use clap::Parser as ArgParser;
 use lexer::{Lexer, TokenKind, Tokenize};
 use parser::{ParseError, StmtParser};
 use resolver::{resolve_names, Ast, NameError};
+use type_checker::{type_check, TypedAst, TypeError};
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -40,12 +41,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print_tokens(&args.input)?;
     }
 
+    // 1- lexing
     let lexer = Lexer::from_path(&args.input)?;
-    let mut parser = StmtParser::new(Box::new(lexer));
 
+    // 2- parsing
     // TODO:
     // return span location,
     // and print it the source context.
+    let mut parser = StmtParser::new(Box::new(lexer));
     let raw_stmts = match parser.parse() {
         Ok(stmts) => stmts,
         Err(error) => match error {
@@ -55,13 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParseError::Starved => panic!("File ended too soon !"),
         },
     };
-
     if args.print_raw_ast {
         for stmt in &raw_stmts {
             println!("{:?}", &stmt);
         }
     }
 
+    // 3 - name resolution
     // TODO: print a proper error message
     let ast = match resolve_names(raw_stmts) {
         Ok(ast) => ast,
@@ -74,11 +77,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     println!("ast: {:?}\n", ast);
-
     for symbol_idx in 0..ast.symbols.len() {
         let symbol = &ast.symbols[symbol_idx];
         println!("{0}: {2:?} (l.{1})", symbol.name, symbol.src.line, symbol.storage_kind);
     }
+    
+    // 4 - type checking
+    let _ = type_check(ast);
 
     Ok(())
 }

@@ -7,7 +7,8 @@ use std::ops::{Index, IndexMut};
 pub enum StorageKind {
     /// includes functions locals and globals
     StackLocal,
-    /// function locals captured by closures
+    /// function locals captured by closures.
+    /// (in the program execution, such variable must be boxed)
     UpValue,
     // TODO: what about object attributes ?
 }
@@ -24,6 +25,8 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    /// Mark a symbol as `upvalue`, eg: a variable captured by
+    /// a closure.
     pub fn promote_as_upvalue(&mut self) {
         self.storage_kind = StorageKind::UpValue;
     }

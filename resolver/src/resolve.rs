@@ -209,8 +209,6 @@ fn resolve_expr_stmt<'table>(
     src: &Span,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
-    use ExprKind::*;
-
     let out_expr: Box<Expr<Sym>> = resolve_expression(in_expr, src, chain)?;
     Ok(StmtKind::Expr(out_expr))
 }
@@ -224,7 +222,6 @@ fn resolve_expression<'table>(
     use ExprKind::*;
     // TODO:
     // use an explicit stack for recursion instead of the stackframe
-
     let out_kind: ExprKind<Sym> = match in_expr.kind {
         Literal(literal_kind) => Literal(literal_kind),
         Unary(kind, inner_expr) => {
@@ -268,10 +265,19 @@ fn resolve_expression<'table>(
             };
             ExprKind::Variable(symbol_id)
         }
-        Get(object_expr, attr_name) => todo!(),
-        Set(object_expr, attr_name, r_value_expr) => todo!(),
-        Super(attr_name) => todo!(),
-        This => todo!(),
+        Get(object_expr, attr_name) => {
+            let object_expr = resolve_expression(object_expr, src, chain)?;
+            ExprKind::Get(object_expr, attr_name)
+        }
+        Set(object_expr, attr_name, r_value_expr) => {
+            let object_expr = resolve_expression(object_expr, src, chain)?;
+            let r_value_expr = resolve_expression(r_value_expr, src, chain)?;
+            ExprKind::Set(object_expr, attr_name, r_value_expr)
+        }
+        // no-op
+        Super(attr_name) => Super(attr_name),
+        // no-op
+        This => This,
     };
     let out_expr = Expr {
         kind: out_kind,

@@ -74,13 +74,13 @@ pub enum ExprKind<Symbol> {
     /// callee, parenthesis, Args
     Call(Box<Expr<Symbol>>, Vec<Expr<Symbol>>),
     /// Object, attribute
-    Get(Box<Expr<Symbol>>, Symbol),
+    Get(Box<Expr<Symbol>>, String),
     /// Object, attribute, value
-    Set(Box<Expr<Symbol>>, Symbol, Box<Expr<Symbol>>),
+    Set(Box<Expr<Symbol>>, String, Box<Expr<Symbol>>),
     /// l_value (identifier), r_value
     Assign(Symbol, Box<Expr<Symbol>>),
     /// method
-    Super(Symbol),
+    Super(String),
     /// keyword
     This,
     /// var name
