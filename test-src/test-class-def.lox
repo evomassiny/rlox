@@ -1,2 +1,6 @@
-class SomeClass {}
+class SomeClass {
+	some_method() {
+		1 + 2;
+	}
+}
 print SomeClass;

@@ -30,16 +30,16 @@ fn resolve_block_stmt<'table>(
 }
 
 fn resolve_class_stmt<'table>(
-    name: String,
+    class_name: String,
     super_name: Option<String>,
     methods: Vec<Stmt<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
-    let name: Sym = chain.add(name, src.clone());
+    let class_name_id: Sym = chain.add(class_name.clone(), src.clone());
     chain.push_scope(ScopeKind::ClassDecl);
 
-    let super_name = match super_name {
+    let super_name_id = match super_name {
         Some(super_name) => match chain.resolve(&super_name) {
             Some(super_name) => Some(super_name),
             None => return Err(NameError::UnboundedVariable(super_name, src.clone())),
@@ -48,11 +48,23 @@ fn resolve_class_stmt<'table>(
     };
 
     let mut out_methods: Vec<Stmt<Sym>> = Vec::new();
-    for method in methods {
-        out_methods.push(resolve_lexical_scope(method, chain)?);
+    for Stmt { kind: method_stmt_kind, span } in methods {
+        let StmtKind::Function(method_name, method_args, method_body) = method_stmt_kind else {
+            panic!(
+                "Parsing error in {class_name}, l. {0}, class definition should only contain methods.",
+                src.line,
+            );
+        };
+        let internal_method_name = format!("{class_name}::{method_name}");
+        let method_stmt_kind =
+            resolve_fun_stmt(internal_method_name, method_args, method_body, &span, chain)?;
+        out_methods.push(Stmt {
+            kind: method_stmt_kind,
+            span: span,
+        });
     }
     chain.pop_scope();
-    Ok(StmtKind::Class(name, super_name, out_methods))
+    Ok(StmtKind::Class(class_name_id, super_name_id, out_methods))
 }
 
 fn resolve_fun_stmt<'table>(

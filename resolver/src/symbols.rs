@@ -22,6 +22,7 @@ pub struct Symbol {
     pub src: Span,
     /// how we should store it
     pub storage_kind: StorageKind,
+    //pub type_constraints: Vec<TypeConstraint>,
 }
 
 impl Symbol {
