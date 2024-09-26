@@ -49,12 +49,14 @@ fn resolve_class_stmt<'table>(
 
     let mut out_methods: Vec<Stmt<Sym>> = Vec::new();
     for Stmt { kind: method_stmt_kind, span } in methods {
+        // validate that we're dealing with method
         let StmtKind::Function(method_name, method_args, method_body) = method_stmt_kind else {
             panic!(
                 "Parsing error in {class_name}, l. {0}, class definition should only contain methods.",
                 src.line,
             );
         };
+        // namespace function name, to avoid collision with standard functions
         let internal_method_name = format!("{class_name}::{method_name}");
         let method_stmt_kind =
             resolve_fun_stmt(internal_method_name, method_args, method_body, &span, chain)?;

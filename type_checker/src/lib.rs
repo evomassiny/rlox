@@ -1,9 +1,5 @@
-use resolver::{SymbolTable, Symbol, Ast};
+mod type_check;
+mod types;
 
-pub enum TypeError { }
-pub enum TypedAst { }
-
-pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
-    todo!()
-}
-
+pub use types::{Type, TypeId, TypeConstraint, TypeTable };
+pub use type_check::{TypeError, TypedAst, type_check };

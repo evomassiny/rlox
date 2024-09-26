@@ -77,10 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     println!("ast: {:?}\n", ast);
-    for symbol_idx in 0..ast.symbols.len() {
-        let symbol = &ast.symbols[symbol_idx];
-        println!("{0}: {2:?} (l.{1})", symbol.name, symbol.src.line, symbol.storage_kind);
-    }
+    println!("{}", &ast.symbols);
     
     // 4 - type checking
     let _ = type_check(ast);
