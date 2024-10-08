@@ -7,7 +7,7 @@ pub struct Type {
 }
 
 /// indentifier for Types,
-/// (newtype pattern over usize)
+/// (newtype pattern wrapping usize)
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct TypeId(usize);
 

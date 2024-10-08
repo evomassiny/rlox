@@ -8,8 +8,6 @@ So far, it differs from the original implementation on the following points:
   * tokenize the input source ([doc](./lexer/README.md))
   * parse the tokens into a basic Abstract Syntax Tree ([doc](./parser/README.md))
   * resolve names on the AST ([doc](./resolver/README.md))
-  * High Level Intermediate Representation 
-  * Typed High Level Intermediate Representation
   ...
   * profit
 
