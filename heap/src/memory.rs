@@ -1,16 +1,16 @@
-use crate::block_headers::{BlockHeader, BlockState};
-use crate::blocks::{Block, BlockError, InBlockPtr, LINE_COUNT};
-use crate::boxed_values::BoxedValue;
-use crate::compactor::{HeapCompactor, LivenessFlag};
-use crate::heap_objects::{Header, Markable, Object};
-use crate::lists::List;
-use crate::strings::Str;
-use crate::tombstones::Tombstone;
-use crate::values::Value;
+use crate::block_headers::BlockState;
+use crate::blocks::{Block, InBlockPtr, LINE_COUNT};
 
 /// in a block, the max number of holes
 /// occurs when one line every two line is marked,
 pub const MAX_NB_OF_HOLE_IN_BLOCK: usize = (LINE_COUNT + 1) / 2;
+
+
+/// round up to nearest multiple of 8.
+#[inline(always)]
+fn round_up_to_8_bytes_aligned(size: usize) -> usize {
+    0xfffffffffffffff8 & (size + 0x7)
+}
 
 #[derive(Debug)]
 pub enum MemoryError {
@@ -31,6 +31,10 @@ impl Memory {
     }
 
     pub(crate) fn alloc(&mut self, alloc_size: usize) -> Result<InBlockPtr, MemoryError> {
+        // align size on 8 bytes, as x86_64 proc don't
+        // allow misaligned memory access.
+        let alloc_size = round_up_to_8_bytes_aligned(alloc_size);
+
         // linearly search for an empty slot big enough for `alloc_size`
         for block in self.blocks.iter_mut() {
             if let Some(address) = block.claim_slot(alloc_size) {
@@ -92,4 +96,13 @@ impl Memory {
         }
         Err(MemoryError::NoFreeBlock)
     }
+}
+
+#[test]
+fn test_size_alignment() {
+    assert_eq!(round_up_to_8_bytes_aligned(8), 8);
+    assert_eq!(round_up_to_8_bytes_aligned(7), 8);
+    assert_eq!(round_up_to_8_bytes_aligned(1), 8);
+    assert_eq!(round_up_to_8_bytes_aligned(0), 0);
+    assert_eq!(round_up_to_8_bytes_aligned(15), 16);
 }
