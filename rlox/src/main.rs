@@ -1,8 +1,8 @@
 use clap::Parser as ArgParser;
 use lexer::{Lexer, TokenKind, Tokenize};
 use parser::{ParseError, StmtParser};
-use resolver::{resolve_names, Ast, NameError};
-use type_checker::{type_check, TypeError, TypedAst};
+use resolver::{resolve_names, NameError};
+use type_checker::type_check;
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]

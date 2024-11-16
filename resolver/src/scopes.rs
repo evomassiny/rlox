@@ -152,6 +152,17 @@ impl<'table> ScopeChain<'table> {
         Sym::Direct(symbol_id)
     }
 
+    pub fn location_of_declaration_in_current_scope(&self, name: &str) -> Option<Span> {
+        if let Some(scope) = self.chain.last() {
+            if let Some(symbol_id) = scope.resolve(name) {
+                let symbol = &self.symbols[symbol_id];
+                    //.expect( "symbol present in chain scope should always exist in the symbol table.");
+                return Some(symbol.src.clone());
+            }
+        }
+        None
+    }
+
     /// traverse the scope chain to find the nearest declaration of `name`
     /// In the process, promote variable as upvalues if needed.
     pub fn resolve(&mut self, name: &str) -> Option<Sym> {

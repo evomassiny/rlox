@@ -5,7 +5,7 @@ use parser::{Expr, ExprKind, Stmt, StmtKind};
 
 #[derive(Debug)]
 pub enum NameError {
-    /// happens when a symbol has been redined twice in the same scope.
+    /// happens when a symbol has been redefined twice in the same scope.
     RedefinitionError(String, Span, Span),
     UnboundedVariable(String, Span),
 }
@@ -188,6 +188,10 @@ fn resolve_var_stmt<'table>(
     src: &Span,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
+    // check that the variable was not already defined in the same scope
+    if let Some(previous_decl) = chain.location_of_declaration_in_current_scope(&name) {
+        return Err(NameError::RedefinitionError(name, src.clone(), previous_decl));
+    }
     // validate intializer expression
     let initializer_expr: Box<Expr<Sym>> = resolve_expression(intializer, src, chain)?;
 
