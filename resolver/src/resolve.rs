@@ -190,7 +190,11 @@ fn resolve_var_stmt<'table>(
 ) -> Result<StmtKind<Sym>, NameError> {
     // check that the variable was not already defined in the same scope
     if let Some(previous_decl) = chain.location_of_declaration_in_current_scope(&name) {
-        return Err(NameError::RedefinitionError(name, src.clone(), previous_decl));
+        return Err(NameError::RedefinitionError(
+            name,
+            src.clone(),
+            previous_decl,
+        ));
     }
     // validate intializer expression
     let initializer_expr: Box<Expr<Sym>> = resolve_expression(intializer, src, chain)?;

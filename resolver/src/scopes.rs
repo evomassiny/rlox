@@ -152,11 +152,13 @@ impl<'table> ScopeChain<'table> {
         Sym::Direct(symbol_id)
     }
 
+    /// If `name` was already declared in the local scope,
+    /// returns its definition location.
     pub fn location_of_declaration_in_current_scope(&self, name: &str) -> Option<Span> {
         if let Some(scope) = self.chain.last() {
             if let Some(symbol_id) = scope.resolve(name) {
+                // symbol present in chain scope should always exist in the symbol table.
                 let symbol = &self.symbols[symbol_id];
-                    //.expect( "symbol present in chain scope should always exist in the symbol table.");
                 return Some(symbol.src.clone());
             }
         }
