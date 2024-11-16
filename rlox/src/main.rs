@@ -2,7 +2,7 @@ use clap::Parser as ArgParser;
 use lexer::{Lexer, TokenKind, Tokenize};
 use parser::{ParseError, StmtParser};
 use resolver::{resolve_names, Ast, NameError};
-use type_checker::{type_check, TypedAst, TypeError};
+use type_checker::{type_check, TypeError, TypedAst};
 
 /// Command line arguments
 #[derive(ArgParser, Debug)]
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     println!("ast: {:?}\n", ast);
     println!("{}", &ast.symbols);
-    
+
     // 4 - type checking
     let _ = type_check(ast);
 

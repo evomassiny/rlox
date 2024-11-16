@@ -1,19 +1,18 @@
-use resolver::{Ast, Symbol, SymbolId, SymbolTable, Sym};
+use super::{Type, TypeConstraint, TypeId, TypeTable};
 use lexer::Span;
 use parser::{Expr, ExprKind, Stmt, StmtKind};
-use super::{Type, TypeId, TypeTable, TypeConstraint};
+use resolver::{Ast, Sym, Symbol, SymbolId, SymbolTable};
 
 #[derive(Debug)]
-pub enum TypeError { }
+pub enum TypeError {}
 
 #[derive(Debug)]
-pub struct TypedAst { }
-
+pub struct TypedAst {}
 
 pub enum MathOp {
     // float |  string
     Add,
-    // float 
+    // float
     Sub,
     // float
     Mul,
@@ -39,7 +38,10 @@ impl ConstraintSet {
     }
 }
 
-fn collect_constraints_in_stmt<'set>(stmt: &Stmt<Sym>, set: &'set mut Vec<ConstraintSet>) -> Result<(), TypeError> {
+fn collect_constraints_in_stmt<'set>(
+    stmt: &Stmt<Sym>,
+    set: &'set mut Vec<ConstraintSet>,
+) -> Result<(), TypeError> {
     Ok(())
 }
 
@@ -55,19 +57,15 @@ fn collect_constraints(ast: &Ast) -> Result<Vec<ConstraintSet>, TypeError> {
         collect_constraints_in_stmt(stmt, &mut contraints_by_symbol)?;
     }
 
-
     Ok(contraints_by_symbol)
 }
-
-
 
 pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     // done in two part:
     // * first we collect a bunch of constraints for each type,
-    //   for instance `a + c` means `a` and `c` are of the same type, 
+    //   for instance `a + c` means `a` and `c` are of the same type,
     //   and this type implements `add`
     // * then we actually solve thoses constraints
     let mut types = TypeTable::new();
     todo!()
 }
-

@@ -163,18 +163,28 @@ impl<'input> StmtParser<'input> {
 
         // parse class name
         self.cursor.advance()?;
-        let Token { kind: TokenKind::Identifier(class_name), .. } = self.cursor.take_previous()? else {
-            return Err(ParseError::ExpectedToken("expected class name in class declaration."));
+        let Token {
+            kind: TokenKind::Identifier(class_name),
+            ..
+        } = self.cursor.take_previous()?
+        else {
+            return Err(ParseError::ExpectedToken(
+                "expected class name in class declaration.",
+            ));
         };
 
         // parse super class name if any
         let mut super_class: Option<String> = None;
         if self.cursor.matches(TokenKind::Less)? {
             self.cursor.advance()?;
-            let Token { kind: TokenKind::Identifier(name), .. } = self.cursor.take_previous()? else {
+            let Token {
+                kind: TokenKind::Identifier(name),
+                ..
+            } = self.cursor.take_previous()?
+            else {
                 return Err(ParseError::ExpectedToken(
-                        "expected identifier in class inheritance declaration."
-                    ));
+                    "expected identifier in class inheritance declaration.",
+                ));
             };
             super_class = Some(name);
         }
@@ -187,8 +197,14 @@ impl<'input> StmtParser<'input> {
         let mut methods: Vec<Stmt> = Vec::new();
         while !self.cursor.check(TokenKind::RightBrace)? {
             self.cursor.advance()?;
-            let Token { kind: TokenKind::Identifier(name), span } = self.cursor.take_previous()? else {
-                return Err(ParseError::ExpectedToken("expected method name in class declaration."));
+            let Token {
+                kind: TokenKind::Identifier(name),
+                span,
+            } = self.cursor.take_previous()?
+            else {
+                return Err(ParseError::ExpectedToken(
+                    "expected method name in class declaration.",
+                ));
             };
             let arguments = self.parse_function_args()?;
             let body = self.parse_function_body()?;
@@ -215,8 +231,14 @@ impl<'input> StmtParser<'input> {
     {
         let Token { span, .. } = self.cursor.take_previous()?;
         let _ = self.cursor.advance();
-        let Token { kind: TokenKind::Identifier(fn_name), .. } = self.cursor.take_previous()? else {
-            return Err(ParseError::ExpectedToken("expected identifier in function declaration."));
+        let Token {
+            kind: TokenKind::Identifier(fn_name),
+            ..
+        } = self.cursor.take_previous()?
+        else {
+            return Err(ParseError::ExpectedToken(
+                "expected identifier in function declaration.",
+            ));
         };
         // parse arguments
         let arguments: Vec<String> = self.parse_function_args()?;
@@ -431,8 +453,14 @@ impl<'input> StmtParser<'input> {
         )?;
         while !self.cursor.matches(TokenKind::RightParen)? {
             self.cursor.advance()?;
-            let Token { kind: TokenKind::Identifier(arg_name), .. } = self.cursor.take_previous()? else {
-                return Err(ParseError::ExpectedToken("expected identifier in function arguments."));
+            let Token {
+                kind: TokenKind::Identifier(arg_name),
+                ..
+            } = self.cursor.take_previous()?
+            else {
+                return Err(ParseError::ExpectedToken(
+                    "expected identifier in function arguments.",
+                ));
             };
             arguments.push(arg_name);
 
@@ -519,8 +547,13 @@ mod stmt_parsing {
     fn parse_expression_statement() {
         let src = "1;";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Expr(expr), .. }) = ast.pop() else {
-            panic!("failed to parse expression statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Expr(expr),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse expression statement.")
+        };
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
 
@@ -529,8 +562,13 @@ mod stmt_parsing {
     fn parse_print_statement() {
         let src = r#"print "hello";"#;
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Print(expr), .. }) = ast.pop() else {
-            panic!("failed to parse print statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Print(expr),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse print statement.")
+        };
         assert_eq!(
             expr.kind,
             ExprKind::Literal(LiteralKind::Str("hello".to_string()))
@@ -542,8 +580,13 @@ mod stmt_parsing {
     fn parse_var_statement() {
         let src = "var a;";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Var(id, expr), .. }) = ast.pop() else {
-            panic!("failed to parse Var statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Var(id, expr),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Var statement.")
+        };
         assert_eq!(id, "a".to_string());
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Nil));
     }
@@ -552,8 +595,13 @@ mod stmt_parsing {
     fn parse_var_statement_with_initializer() {
         let src = "var a = 1;";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Var(id, expr), .. }) = ast.pop() else {
-            panic!("failed to parse Var statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Var(id, expr),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Var statement.")
+        };
         assert_eq!(id, "a".to_string());
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
@@ -562,11 +610,21 @@ mod stmt_parsing {
     fn parse_block_statement() {
         let src = "{ 1; }";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Block(mut statements), .. }) = ast.pop() else {
-            panic!("failed to parse Block statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Block(mut statements),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Block statement.")
+        };
 
-        let Some(Stmt { kind: StmtKind::Expr(expr), .. }) = statements.pop() else {
-            panic!("failed to parse inner expression in Block statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Expr(expr),
+            ..
+        }) = statements.pop()
+        else {
+            panic!("failed to parse inner expression in Block statement.")
+        };
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));
     }
 
@@ -574,40 +632,75 @@ mod stmt_parsing {
     fn parse_if_statement() {
         let src = "if (true) { 1; }";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::If(cond_expr, then_block, None), .. }) = ast.pop() else {
-            panic!("failed to parse If statement.") };
+        let Some(Stmt {
+            kind: StmtKind::If(cond_expr, then_block, None),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse If statement.")
+        };
         assert_eq!(cond_expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
-        let Stmt { kind: StmtKind::Block(_), .. } = *then_block else {
-            panic!("failed to parse then branch as Block statement.") };
+        let Stmt {
+            kind: StmtKind::Block(_),
+            ..
+        } = *then_block
+        else {
+            panic!("failed to parse then branch as Block statement.")
+        };
     }
 
     #[test]
     fn parse_if_statement_with_else_branch() {
         let src = "if (true) { 1; } else { 2; }";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::If(cond_expr, then_block, Some(else_block)), .. }) = ast.pop() else {
-            panic!("failed to parse If statement.") };
+        let Some(Stmt {
+            kind: StmtKind::If(cond_expr, then_block, Some(else_block)),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse If statement.")
+        };
         assert_eq!(cond_expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
-        let Stmt { kind: StmtKind::Block(_), .. } = *then_block else {
-            panic!("failed to parse 'then' branch as Block statement.") };
-        let Stmt { kind: StmtKind::Block(_), .. } = *else_block else {
-            panic!("failed to parse 'else' branch as Block statement.") };
+        let Stmt {
+            kind: StmtKind::Block(_),
+            ..
+        } = *then_block
+        else {
+            panic!("failed to parse 'then' branch as Block statement.")
+        };
+        let Stmt {
+            kind: StmtKind::Block(_),
+            ..
+        } = *else_block
+        else {
+            panic!("failed to parse 'else' branch as Block statement.")
+        };
     }
 
     #[test]
     fn parse_naked_return_statement() {
         let src = "return;";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Return(None), .. }) = ast.pop() else {
-            panic!("failed to parse Return statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Return(None),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Return statement.")
+        };
     }
 
     #[test]
     fn parse_return_statement_with_value() {
         let src = "return true;";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Return(Some(expr)), .. }) = ast.pop() else {
-            panic!("failed to parse Return statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Return(Some(expr)),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Return statement.")
+        };
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
     }
 
@@ -615,8 +708,13 @@ mod stmt_parsing {
     fn parse_while_statement() {
         let src = "while (true) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::While(expr, _block_stmt), .. }) = ast.pop() else {
-            panic!("failed to parse while statement.") };
+        let Some(Stmt {
+            kind: StmtKind::While(expr, _block_stmt),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse while statement.")
+        };
         assert_eq!(expr.kind, ExprKind::Literal(LiteralKind::Bool(true)));
     }
 
@@ -624,8 +722,13 @@ mod stmt_parsing {
     fn parse_for_statement() {
         let src = "for (1; 2; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), Some(increment), _block), .. }) = ast.pop() else {
-            panic!("failed to parse For statement.") };
+        let Some(Stmt {
+            kind: StmtKind::For(Some(initializer), Some(condition), Some(increment), _block),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse For statement.")
+        };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
         assert_eq!(increment.kind, ExprKind::Literal(LiteralKind::Num(3.)));
@@ -635,8 +738,13 @@ mod stmt_parsing {
     fn parse_for_statement_without_initializer() {
         let src = "for (; 2; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(None, Some(condition), Some(increment), _block), .. }) = ast.pop() else {
-            panic!("failed to parse For statement.") };
+        let Some(Stmt {
+            kind: StmtKind::For(None, Some(condition), Some(increment), _block),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse For statement.")
+        };
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
         assert_eq!(increment.kind, ExprKind::Literal(LiteralKind::Num(3.)));
     }
@@ -645,8 +753,13 @@ mod stmt_parsing {
     fn parse_for_statement_without_condition() {
         let src = "for (1; ; 3) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), None, Some(increment), _block), .. }) = ast.pop() else {
-            panic!("failed to parse For statement.") };
+        let Some(Stmt {
+            kind: StmtKind::For(Some(initializer), None, Some(increment), _block),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse For statement.")
+        };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(increment.kind, ExprKind::Literal(LiteralKind::Num(3.)));
     }
@@ -655,8 +768,13 @@ mod stmt_parsing {
     fn parse_for_statement_without_increment() {
         let src = "for (1; 2; ) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(Some(initializer), Some(condition), None, _block), .. }) = ast.pop() else {
-            panic!("failed to parse For statement.") };
+        let Some(Stmt {
+            kind: StmtKind::For(Some(initializer), Some(condition), None, _block),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse For statement.")
+        };
         assert_eq!(initializer.kind, ExprKind::Literal(LiteralKind::Num(1.)));
         assert_eq!(condition.kind, ExprKind::Literal(LiteralKind::Num(2.)));
     }
@@ -665,16 +783,26 @@ mod stmt_parsing {
     fn parse_naked_for_statement() {
         let src = "for (;;) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::For(None, None, None, _block), .. }) = ast.pop() else {
-            panic!("failed to parse For statement.") };
+        let Some(Stmt {
+            kind: StmtKind::For(None, None, None, _block),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse For statement.")
+        };
     }
 
     #[test]
     fn parse_function_declaration() {
         let src = "fun foo() {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Function(name, args, body), .. }) = ast.pop() else {
-            panic!("failed to parse Function declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Function(name, args, body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Function declaration statement.")
+        };
         assert_eq!(&name, "foo");
         assert!(args.is_empty());
         assert!(body.is_empty());
@@ -684,8 +812,13 @@ mod stmt_parsing {
     fn parse_function_declaration_with_args() {
         let src = "fun foo(a, b) {}";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Function(name, args, body), .. }) = ast.pop() else {
-            panic!("failed to parse Function declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Function(name, args, body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Function declaration statement.")
+        };
         assert_eq!(&name, "foo");
         assert_eq!(args, vec!["a".to_string(), "b".to_string()]);
         assert!(body.is_empty());
@@ -695,12 +828,18 @@ mod stmt_parsing {
     fn parse_function_declaration_with_args_and_body() {
         let src = "fun foo(a, b) { return 1; }";
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Function(name, args, mut body), .. }) = ast.pop() else {
-            panic!("failed to parse Function declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Function(name, args, mut body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Function declaration statement.")
+        };
         assert_eq!(&name, "foo");
         assert_eq!(args, vec!["a".to_string(), "b".to_string()]);
-        let Some(_stmt) = body.pop() else  {
-            panic!("Failed to parse function body."); };
+        let Some(_stmt) = body.pop() else {
+            panic!("Failed to parse function body.");
+        };
     }
 
     #[test]
@@ -709,8 +848,13 @@ mod stmt_parsing {
             class foo {}
         "#;
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Class(name, None, body), .. }) = ast.pop() else {
-            panic!("failed to parse Class declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Class(name, None, body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Class declaration statement.")
+        };
         assert_eq!(&name, "foo");
         assert!(body.is_empty());
     }
@@ -721,8 +865,13 @@ mod stmt_parsing {
             class foo < bar {}
         "#;
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Class(name, Some(super_name), body), .. }) = ast.pop() else {
-            panic!("failed to parse Class declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Class(name, Some(super_name), body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Class declaration statement.")
+        };
         assert_eq!(&name, "foo");
         assert_eq!(&super_name, "bar");
         assert!(body.is_empty());
@@ -737,14 +886,29 @@ mod stmt_parsing {
             }
         "#;
         let mut ast = parse_statement(src).unwrap();
-        let Some(Stmt { kind: StmtKind::Class(name, None, mut body), .. }) = ast.pop() else {
-            panic!("failed to parse Class declaration statement.") };
+        let Some(Stmt {
+            kind: StmtKind::Class(name, None, mut body),
+            ..
+        }) = ast.pop()
+        else {
+            panic!("failed to parse Class declaration statement.")
+        };
         assert_eq!(&name, "foo");
-        let Some(Stmt { kind: StmtKind::Function(method_name, _args, _fn_body), .. }) = body.pop() else  {
-            panic!("Failed to parse class method."); };
+        let Some(Stmt {
+            kind: StmtKind::Function(method_name, _args, _fn_body),
+            ..
+        }) = body.pop()
+        else {
+            panic!("Failed to parse class method.");
+        };
         assert_eq!(&method_name, "baz");
-        let Some(Stmt { kind: StmtKind::Function(method_name, _args, _fn_body), .. }) = body.pop() else  {
-            panic!("Failed to parse class method."); };
+        let Some(Stmt {
+            kind: StmtKind::Function(method_name, _args, _fn_body),
+            ..
+        }) = body.pop()
+        else {
+            panic!("Failed to parse class method.");
+        };
         assert_eq!(&method_name, "bar");
     }
 }

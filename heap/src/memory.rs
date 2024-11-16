@@ -5,7 +5,6 @@ use crate::blocks::{Block, InBlockPtr, LINE_COUNT};
 /// occurs when one line every two line is marked,
 pub const MAX_NB_OF_HOLE_IN_BLOCK: usize = (LINE_COUNT + 1) / 2;
 
-
 /// round up to nearest multiple of 8.
 #[inline(always)]
 fn round_up_to_8_bytes_aligned(size: usize) -> usize {

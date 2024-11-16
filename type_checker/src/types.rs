@@ -13,7 +13,7 @@ pub struct TypeId(usize);
 
 /// holds all types known by the user script
 pub struct TypeTable {
-    types: Vec<Type>
+    types: Vec<Type>,
 }
 
 impl TypeTable {
@@ -48,4 +48,3 @@ impl IndexMut<&TypeId> for TypeTable {
         &mut self.types[(*index).0]
     }
 }
-

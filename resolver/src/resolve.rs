@@ -48,7 +48,11 @@ fn resolve_class_stmt<'table>(
     };
 
     let mut out_methods: Vec<Stmt<Sym>> = Vec::new();
-    for Stmt { kind: method_stmt_kind, span } in methods {
+    for Stmt {
+        kind: method_stmt_kind,
+        span,
+    } in methods
+    {
         // validate that we're dealing with method
         let StmtKind::Function(method_name, method_args, method_body) = method_stmt_kind else {
             panic!(
