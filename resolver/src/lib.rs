@@ -10,18 +10,21 @@ pub use symbols::{Sym, Symbol, SymbolId, SymbolTable};
 
 #[cfg(test)]
 mod stmt_parsing {
-    use parser::{Stmt,StmtParser};
+    use super::{resolve_names, NameError, Symbol};
     use lexer::{Lexer, StrPeeker};
-    use super::{resolve_names, NameError,Symbol};
+    use parser::{Stmt, StmtParser};
 
     fn parse(src: &'static str) -> Vec<Stmt<String>> {
         let lexer: Lexer<StrPeeker<'_, 64>> = Lexer::from_str(src);
         let mut parser = StmtParser::new(Box::new(lexer));
-        parser.parse().expect("these test examples sources must be parseable !")
+        parser
+            .parse()
+            .expect("these test examples sources must be parseable !")
     }
 
     #[test]
-    /// test parsing a single expression statement
+    /// test that shadowing a variable in a single scope
+    /// is disallowed
     fn check_var_declaration_duplication() {
         let src = r#"
         fun foo() {
@@ -33,5 +36,30 @@ mod stmt_parsing {
         assert!(resolve_names(ast).is_err());
     }
 
+    #[test]
+    /// assert that shadowing a variable across scopes is allowed.
+    fn check_var_shadowing() {
+        let src = r#"
+        var a = 1;
 
+        fun foo() {
+          var a = 1;
+        }
+        foo();
+        "#;
+        let mut ast = parse(src);
+        assert!(resolve_names(ast).is_some());
+    }
+
+    #[test]
+    /// test that using an undefined variable raises an error.
+    fn check_undefined_variable() {
+        let src = r#"
+        fun foo() {
+          a = 1;
+        }
+        "#;
+        let mut ast = parse(src);
+        assert!(resolve_names(ast).is_err());
+    }
 }
