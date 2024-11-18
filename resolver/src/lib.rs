@@ -6,11 +6,11 @@ mod symbols;
 
 pub use resolve::{resolve_names, Ast, NameError};
 use scopes::{Globals, ScopeChain};
-pub use symbols::{Sym, Symbol, SymbolId, SymbolTable};
+pub use symbols::{StorageKind, Sym, Symbol, SymbolId, SymbolTable};
 
 #[cfg(test)]
-mod stmt_parsing {
-    use super::{resolve_names, NameError, Symbol};
+mod resolver {
+    use super::{resolve_names, NameError, StorageKind, Symbol};
     use lexer::{Lexer, StrPeeker};
     use parser::{Stmt, StmtParser};
 
@@ -32,7 +32,7 @@ mod stmt_parsing {
           var a = 1;
         }
         "#;
-        let mut ast = parse(src);
+        let ast = parse(src);
         assert!(resolve_names(ast).is_err());
     }
 
@@ -47,8 +47,8 @@ mod stmt_parsing {
         }
         foo();
         "#;
-        let mut ast = parse(src);
-        assert!(resolve_names(ast).is_some());
+        let ast = parse(src);
+        assert!(resolve_names(ast).is_ok());
     }
 
     #[test]
@@ -59,7 +59,31 @@ mod stmt_parsing {
           a = 1;
         }
         "#;
-        let mut ast = parse(src);
+        let ast = parse(src);
         assert!(resolve_names(ast).is_err());
+    }
+
+    #[test]
+    /// assert that upvalues are promoted as such
+    fn check_upvalue_promotion() {
+        let src = r#"
+        fun foo() {
+          var a = 1;
+          fun closure() {
+              a = a + 1;
+              return a;
+          }
+          return closure;
+        }
+        "#;
+        let ast = parse(src);
+        let ast = resolve_names(ast).expect("failed to resolve valid code.");
+        let symbol_for_a = ast
+            .symbols
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name == "a")
+            .expect("symbol 'a' not found.");
+        assert_eq!(symbol_for_a.storage_kind, StorageKind::UpValue);
     }
 }

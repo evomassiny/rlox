@@ -66,6 +66,7 @@ pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     //   for instance `a + c` means `a` and `c` are of the same type,
     //   and this type implements `add`
     // * then we actually solve thoses constraints
+    let constraints = collect_constraints(&untyped_ast)?;
     let mut types = TypeTable::new();
     todo!()
 }
