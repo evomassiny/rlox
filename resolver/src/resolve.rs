@@ -1,7 +1,7 @@
 use super::scopes::{Globals, ScopeChain, ScopeKind};
 use super::symbols::{Sym, Symbol, SymbolId, SymbolTable};
 use lexer::Span;
-use parser::{Expr, ExprKind, Stmt, StmtKind};
+use parser::{Expr, ExprKind, Stmt, StmtKind, NodeId};
 
 #[derive(Debug)]
 pub enum NameError {
@@ -23,12 +23,13 @@ fn resolve_block_stmt<'table>(
     chain.push_scope(ScopeKind::Block);
     let mut block_stmts: Vec<Stmt<Sym>> = Vec::new();
     for in_body_stmt in stmts {
-        block_stmts.push(resolve_lexical_scope(in_body_stmt, chain)?);
+        block_stmts.push(resolve_names_in_stmt(in_body_stmt, chain)?);
     }
     chain.pop_scope();
     Ok(StmtKind::Block(block_stmts))
 }
 
+/// resolve names in class declaration
 fn resolve_class_stmt<'table>(
     class_name: String,
     super_name: Option<String>,
@@ -51,6 +52,7 @@ fn resolve_class_stmt<'table>(
     for Stmt {
         kind: method_stmt_kind,
         span,
+        id,
     } in methods
     {
         // validate that we're dealing with method
@@ -67,12 +69,14 @@ fn resolve_class_stmt<'table>(
         out_methods.push(Stmt {
             kind: method_stmt_kind,
             span: span,
+            id,
         });
     }
     chain.pop_scope();
     Ok(StmtKind::Class(class_name_id, super_name_id, out_methods))
 }
 
+/// resolve names in function declarations
 fn resolve_fun_stmt<'table>(
     name: String,
     args: Vec<String>,
@@ -94,7 +98,7 @@ fn resolve_fun_stmt<'table>(
     // resolve body statements
     let mut resolved_stmts = Vec::new();
     for stmt in body {
-        resolved_stmts.push(resolve_lexical_scope(stmt, chain)?);
+        resolved_stmts.push(resolve_names_in_stmt(stmt, chain)?);
     }
 
     chain.pop_scope();
@@ -116,13 +120,13 @@ fn resolve_if_stmt<'table>(
     // we need to introduce a new scope, otherwise a variable defined in the
     // "then" branch could be used in the "else" one.
     chain.push_scope(ScopeKind::Block);
-    let then_branch: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*then_branch, chain)?);
+    let then_branch: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*then_branch, chain)?);
     chain.pop_scope();
     // validate "else" branch
     let maybe_else_branch: Option<Box<Stmt<Sym>>> = match maybe_else_branch {
         Some(else_branch) => {
             chain.push_scope(ScopeKind::Block);
-            let else_branch = Box::new(resolve_lexical_scope(*else_branch, chain)?);
+            let else_branch = Box::new(resolve_names_in_stmt(*else_branch, chain)?);
             chain.pop_scope();
             Some(else_branch)
         }
@@ -142,10 +146,11 @@ fn resolve_while_stmt<'table>(
     let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
     // validate body statement
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
+    let body: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::While(condition, body))
 }
+
 /// resolve the bindings in a For statement
 fn resolve_for_stmt<'table>(
     maybe_initializer: Option<Box<Expr<String>>>,
@@ -171,7 +176,7 @@ fn resolve_for_stmt<'table>(
 
     // validate for body
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<Sym>> = Box::new(resolve_lexical_scope(*body, chain)?);
+    let body: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::For(
         maybe_initializer,
@@ -180,6 +185,7 @@ fn resolve_for_stmt<'table>(
         body,
     ))
 }
+
 /// register the new variable binding,
 /// and validate the initializer expression
 fn resolve_var_stmt<'table>(
@@ -239,7 +245,7 @@ fn resolve_expr_stmt<'table>(
     Ok(StmtKind::Expr(out_expr))
 }
 
-/// validate expression names
+/// recursively validate expression names
 fn resolve_expression<'table>(
     in_expr: Box<Expr<String>>,
     src: &Span,
@@ -308,13 +314,14 @@ fn resolve_expression<'table>(
     let out_expr = Expr {
         kind: out_kind,
         span: in_expr.span,
+        id: in_expr.id,
     };
     Ok(Box::new(out_expr))
 }
 
 /// recursively traverse the AST starting from `in_stmt`,
 /// and resolve variable names along the way.
-fn resolve_lexical_scope<'table>(
+fn resolve_names_in_stmt<'table>(
     in_stmt: Stmt<String>,
     chain: &mut ScopeChain<'table>,
 ) -> Result<Stmt<Sym>, NameError> {
@@ -345,6 +352,7 @@ fn resolve_lexical_scope<'table>(
     Ok(Stmt {
         kind: out_kind,
         span: in_stmt.span,
+        id: in_stmt.id,
     })
 }
 
@@ -390,7 +398,7 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
     let mut chain = ScopeChain::new(globals, &mut symbols);
     let mut out_stmts: Vec<Stmt<Sym>> = Vec::new();
     for stmt in in_ast {
-        let stmt = resolve_lexical_scope(stmt, &mut chain)?;
+        let stmt = resolve_names_in_stmt(stmt, &mut chain)?;
         out_stmts.push(stmt);
     }
 

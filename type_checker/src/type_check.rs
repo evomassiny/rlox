@@ -1,7 +1,6 @@
-use super::{Type, TypeConstraint, TypeId, TypeTable};
-use lexer::Span;
+use super::TypeTable;
 use parser::{Expr, ExprKind, Stmt, StmtKind};
-use resolver::{Ast, Sym, Symbol, SymbolId, SymbolTable};
+use resolver::{Ast, Sym, SymbolId};
 
 #[derive(Debug)]
 pub enum TypeError {}
@@ -38,10 +37,47 @@ impl ConstraintSet {
     }
 }
 
+fn collect_expression_constraints<'set>(
+    expr: &Expr<Sym>,
+    set: &'set mut Vec<ConstraintSet>,
+) -> Result<(), TypeError> {
+
+    use ExprKind::*;
+    match &expr.kind {
+        Literal(literal_kind) => todo!(),
+        Unary(kind, inner_expr) => todo!(),
+        Binary(left_expr, kind, right_expr) => todo!(),
+        Logical(left_expr, kind, right_expr) => todo!(),
+        Grouping(inner_expr) => collect_expression_constraints(inner_expr, set),
+        Call(callee_expr, args) => todo!(),
+        Assign(bind_name, r_value_expr) => todo!(),
+        Variable(bind_name) => todo!(),
+        Get(object_expr, attr_name) => todo!(),
+        Set(object_expr, attr_name, r_value_expr) => todo!(),
+        Super(attr_name) => todo!(),
+        This => todo!(),
+    };
+    Ok(())
+}
+
 fn collect_constraints_in_stmt<'set>(
     stmt: &Stmt<Sym>,
     set: &'set mut Vec<ConstraintSet>,
 ) -> Result<(), TypeError> {
+
+    use StmtKind::*;
+    match &stmt.kind {
+        Block(stmts) => todo!(),
+        Class(name, maybe_super_name, methods) => todo!(),
+        If(condition, then, maybe_else) => todo!(),
+        Function(name, args, body) => todo!(),
+        Expr(expr) => collect_expression_constraints(expr, set),
+        Print(expr) => todo!(),
+        Return(maybe_expr) => todo!(),
+        Var(name, intializer) => todo!(),
+        While(condition, body) => todo!(),
+        For(maybe_initializer, maybe_condition, maybe_increment, body) => todo!(),
+    };
     Ok(())
 }
 
@@ -67,6 +103,6 @@ pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     //   and this type implements `add`
     // * then we actually solve thoses constraints
     let constraints = collect_constraints(&untyped_ast)?;
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     todo!()
 }

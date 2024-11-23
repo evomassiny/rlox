@@ -10,10 +10,15 @@
 /// we switch to references to a dedicated type (see `resolver::symbols`).
 use lexer::Span;
 
+/// Identify an AST Node, (statements and expression alike).
+pub type NodeId = usize;
+
 /// A Statement
 /// (source that don't evaluate to a value)
 #[derive(Debug, PartialEq)]
 pub struct Stmt<Symbol> {
+    /// An id identifiying the AST node
+    pub id: NodeId,
     /// All statement variants
     pub kind: StmtKind<Symbol>,
     /// position in source string
@@ -54,6 +59,8 @@ pub enum StmtKind<Symbol> {
 /// (source that evaluates to a value)
 #[derive(Debug, PartialEq)]
 pub struct Expr<Symbol> {
+    /// An id identifiying the AST node
+    pub id: NodeId,
     /// All Expression variants
     pub kind: ExprKind<Symbol>,
     /// position in source string

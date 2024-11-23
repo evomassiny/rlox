@@ -1,4 +1,5 @@
 use lexer::{LexerError, Span, Token, TokenKind, Tokenize};
+use super::ast::NodeId;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -8,20 +9,23 @@ pub enum ParseError {
     Starved,
 }
 
-/// A struct to handle navigating a stream
+/// Handles the parser state while navigating the stream
 /// of tokens.
-pub struct Cursor<'input> {
+pub struct ParserState<'input> {
     lexer: Box<dyn Tokenize + 'input>,
     current: Option<Token>,
     previous: Option<Token>,
+    /// used to label AST node, as we create them
+    ast_id_inc: NodeId,
 }
 
-impl<'input> Cursor<'input> {
+impl<'input> ParserState<'input> {
     pub fn new(lexer: Box<dyn Tokenize + 'input>) -> Self {
         Self {
             lexer,
             current: None,
             previous: None,
+            ast_id_inc: 0,
         }
     }
 
@@ -145,5 +149,12 @@ impl<'input> Cursor<'input> {
     /// (in the source input string).
     pub fn current_position(&mut self) -> Span {
         self.lexer.current_position()
+    }
+
+    /// return a fresh, unique, NodeId
+    pub fn new_node_id(&mut self) -> NodeId {
+        let id = self.ast_id_inc;
+        self.ast_id_inc += 1;
+        id
     }
 }

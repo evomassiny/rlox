@@ -2,7 +2,7 @@ use super::ast::{
     Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, Stmt as GenericStmt,
     StmtKind as GenericStmtKind,
 };
-use super::cursor::{Cursor, ParseError};
+use super::parser_state::{ParserState, ParseError};
 use super::expr_parser::ExprParser;
 use lexer::{Token, TokenKind, Tokenize};
 
@@ -16,13 +16,13 @@ pub type StmtKind = GenericStmtKind<String>;
 /// Parse statements using an explicit recursive
 /// descent parser, and expressions using a Pratt Parser.
 pub struct StmtParser<'input> {
-    cursor: Cursor<'input>,
+    state: ParserState<'input>,
 }
 
 impl<'input> StmtParser<'input> {
     pub fn new(lexer: Box<dyn Tokenize + 'input>) -> Self {
-        let cursor = Cursor::new(lexer);
-        Self { cursor }
+        let state = ParserState::new(lexer);
+        Self { state }
     }
 
     /**
@@ -38,19 +38,19 @@ impl<'input> StmtParser<'input> {
     where
         'input: 'parser,
     {
-        let current: &TokenKind = &self.cursor.current()?.kind;
+        let current: &TokenKind = &self.state.current()?.kind;
         match *current {
             TokenKind::Var => {
-                // position cursor rigt after `var` token;
-                self.cursor.advance()?;
+                // position state rigt after `var` token;
+                self.state.advance()?;
                 self.var_declaration()
             }
             TokenKind::Class => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.class_declaration()
             }
             TokenKind::Fun => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.fun_declaration()
             }
             _ => self.statement(),
@@ -72,37 +72,37 @@ impl<'input> StmtParser<'input> {
     where
         'input: 'parser,
     {
-        let current: &TokenKind = &self.cursor.current()?.kind;
+        let current: &TokenKind = &self.state.current()?.kind;
         match *current {
             TokenKind::Print => {
-                // position cursor right after `print
-                let _ = self.cursor.advance();
+                // position state right after `print
+                let _ = self.state.advance();
                 self.print_statement()
             }
             TokenKind::LeftBrace => {
-                // position cursor right after `{`
-                let _ = self.cursor.advance();
+                // position state right after `{`
+                let _ = self.state.advance();
                 self.block_statement()
             }
             TokenKind::If => {
-                // position cursor right after `if
-                let _ = self.cursor.advance();
+                // position state right after `if
+                let _ = self.state.advance();
                 self.if_statement()
             }
             TokenKind::Return => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.return_statement()
             }
             TokenKind::While => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.while_statement()
             }
             TokenKind::For => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.for_statement()
             }
             TokenKind::For => {
-                self.cursor.advance()?;
+                self.state.advance()?;
                 self.for_statement()
             }
             _ => self.expression_statement(),
@@ -116,34 +116,38 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // store span of `var` token
-        let Token { span: var_span, .. } = self.cursor.take_previous()?;
+        let Token { span: var_span, .. } = self.state.take_previous()?;
 
         // parse next expression
         let expr = self.parse_one_expression()?;
-        self.cursor
+        self.state
             .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
 
         match expr {
             // case with no initializer
             Expr {
-                kind: ExprKind::Variable(id),
+                kind: ExprKind::Variable(identifier),
+                id: var_id,
                 span,
             } => {
                 let nil_expr = Expr {
                     kind: ExprKind::Literal(LiteralKind::Nil),
+                    id: self.state.new_node_id(),
                     span,
                 };
                 Ok(Stmt {
-                    kind: StmtKind::Var(id, Box::new(nil_expr)),
+                    id: var_id,
+                    kind: StmtKind::Var(identifier, Box::new(nil_expr)),
                     span: var_span,
                 })
             }
             // case with initializer
             Expr {
-                kind: ExprKind::Assign(id, initializer),
+                kind: ExprKind::Assign(identifier, initializer),
                 ..
             } => Ok(Stmt {
-                kind: StmtKind::Var(id, initializer),
+                id: self.state.new_node_id(),
+                kind: StmtKind::Var(identifier, initializer),
                 span: var_span,
             }),
             _ => Err(ParseError::ExpectedExpression("Expected variable name.")),
@@ -159,14 +163,14 @@ impl<'input> StmtParser<'input> {
         // store span of `class` token
         let Token {
             span: class_span, ..
-        } = self.cursor.take_previous()?;
+        } = self.state.take_previous()?;
 
         // parse class name
-        self.cursor.advance()?;
+        self.state.advance()?;
         let Token {
             kind: TokenKind::Identifier(class_name),
             ..
-        } = self.cursor.take_previous()?
+        } = self.state.take_previous()?
         else {
             return Err(ParseError::ExpectedToken(
                 "expected class name in class declaration.",
@@ -175,12 +179,12 @@ impl<'input> StmtParser<'input> {
 
         // parse super class name if any
         let mut super_class: Option<String> = None;
-        if self.cursor.matches(TokenKind::Less)? {
-            self.cursor.advance()?;
+        if self.state.matches(TokenKind::Less)? {
+            self.state.advance()?;
             let Token {
                 kind: TokenKind::Identifier(name),
                 ..
-            } = self.cursor.take_previous()?
+            } = self.state.take_previous()?
             else {
                 return Err(ParseError::ExpectedToken(
                     "expected identifier in class inheritance declaration.",
@@ -189,18 +193,18 @@ impl<'input> StmtParser<'input> {
             super_class = Some(name);
         }
 
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftBrace,
             "Expected '{' after class declaration.",
         )?;
 
         let mut methods: Vec<Stmt> = Vec::new();
-        while !self.cursor.check(TokenKind::RightBrace)? {
-            self.cursor.advance()?;
+        while !self.state.check(TokenKind::RightBrace)? {
+            self.state.advance()?;
             let Token {
                 kind: TokenKind::Identifier(name),
                 span,
-            } = self.cursor.take_previous()?
+            } = self.state.take_previous()?
             else {
                 return Err(ParseError::ExpectedToken(
                     "expected method name in class declaration.",
@@ -209,17 +213,19 @@ impl<'input> StmtParser<'input> {
             let arguments = self.parse_function_args()?;
             let body = self.parse_function_body()?;
             let method = Stmt {
+                id: self.state.new_node_id(),
                 kind: StmtKind::Function(name, arguments, body),
                 span,
             };
             methods.push(method);
         }
 
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::RightBrace,
             "Expected '{' after class declaration.",
         )?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::Class(class_name, super_class, methods),
             span: class_span,
         })
@@ -229,12 +235,12 @@ impl<'input> StmtParser<'input> {
     where
         'input: 'parser,
     {
-        let Token { span, .. } = self.cursor.take_previous()?;
-        let _ = self.cursor.advance();
+        let Token { span, .. } = self.state.take_previous()?;
+        let _ = self.state.advance();
         let Token {
             kind: TokenKind::Identifier(fn_name),
             ..
-        } = self.cursor.take_previous()?
+        } = self.state.take_previous()?
         else {
             return Err(ParseError::ExpectedToken(
                 "expected identifier in function declaration.",
@@ -245,6 +251,7 @@ impl<'input> StmtParser<'input> {
         // parse body
         let body: Vec<Stmt> = self.parse_function_body()?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::Function(fn_name, arguments, body),
             span,
         })
@@ -256,18 +263,19 @@ impl<'input> StmtParser<'input> {
     where
         'input: 'parser,
     {
-        let Token { span, .. } = self.cursor.take_previous()?;
+        let Token { span, .. } = self.state.take_previous()?;
 
         // parse sub-statements until we encounter a '}'
         let mut statements: Vec<Stmt> = Vec::new();
-        while !self.cursor.check(TokenKind::RightBrace)? {
+        while !self.state.check(TokenKind::RightBrace)? {
             let stmt = self.declaration()?;
             statements.push(stmt);
         }
-        self.cursor
+        self.state
             .consume(TokenKind::RightParen, "Expect '}' after block.")?;
 
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::Block(statements),
             span,
         })
@@ -280,17 +288,18 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // span of the `return` token
-        let Token { span, .. } = self.cursor.take_previous()?;
+        let Token { span, .. } = self.state.take_previous()?;
         let mut maybe_expr: Option<Box<Expr>> = None;
-        if !self.cursor.check(TokenKind::Semicolon)? {
+        if !self.state.check(TokenKind::Semicolon)? {
             let expr = self.parse_one_expression()?;
             maybe_expr = Some(Box::new(expr));
         }
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::Semicolon,
             "Expected ';' add the end of return statement.",
         )?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::Return(maybe_expr),
             span,
         })
@@ -303,16 +312,17 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // span of the `while` token
-        let Token { span, .. } = self.cursor.take_previous()?;
-        self.cursor
+        let Token { span, .. } = self.state.take_previous()?;
+        self.state
             .consume(TokenKind::LeftParen, "Expected '(' after 'while'.")?;
         let condition_expression = self.parse_one_expression()?;
-        self.cursor
+        self.state
             .consume(TokenKind::RightBrace, "Expected ')' after 'while'.")?;
-        self.cursor
+        self.state
             .consume(TokenKind::LeftBrace, "Expected '{' after while condition.")?;
         let stmt = self.block_statement()?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::While(Box::new(condition_expression), Box::new(stmt)),
             span,
         })
@@ -325,45 +335,46 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // span of the `for` token
-        let Token { span, .. } = self.cursor.take_previous()?;
+        let Token { span, .. } = self.state.take_previous()?;
         let mut initializer: Option<Box<Expr>> = None;
         let mut condition: Option<Box<Expr>> = None;
         let mut increment: Option<Box<Expr>> = None;
 
         // parse initializer
-        self.cursor
+        self.state
             .consume(TokenKind::LeftParen, "Expected '(' after 'for'.")?;
-        if !self.cursor.matches(TokenKind::Semicolon)? {
+        if !self.state.matches(TokenKind::Semicolon)? {
             initializer = Some(Box::new(self.parse_one_expression()?));
-            self.cursor.consume(
+            self.state.consume(
                 TokenKind::Semicolon,
                 "Expected ';' after initializer in 'for' statement.",
             )?;
         }
         // parse condition
-        if !self.cursor.matches(TokenKind::Semicolon)? {
+        if !self.state.matches(TokenKind::Semicolon)? {
             condition = Some(Box::new(self.parse_one_expression()?));
-            self.cursor.consume(
+            self.state.consume(
                 TokenKind::Semicolon,
                 "Expected ';' after condition in 'for' statement.",
             )?;
         }
         // parse increment
-        if !self.cursor.matches(TokenKind::RightParen)? {
+        if !self.state.matches(TokenKind::RightParen)? {
             increment = Some(Box::new(self.parse_one_expression()?));
-            self.cursor.consume(
+            self.state.consume(
                 TokenKind::RightParen,
                 "Expected ')' after increment in 'for' statement.",
             )?;
         }
 
         // parse block
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftBrace,
             "Expected '{' after in 'for' statement.",
         )?;
         let block = self.block_statement()?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::For(initializer, condition, increment, Box::new(block)),
             span,
         })
@@ -375,14 +386,15 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // store 'print' span
-        let Token { span, .. } = self.cursor.take_previous()?;
+        let Token { span, .. } = self.state.take_previous()?;
 
         // parse following expression
         let expr = self.parse_one_expression()?;
-        self.cursor
+        self.state
             .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
 
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::Print(Box::new(expr)),
             span,
         })
@@ -393,22 +405,22 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         // store 'if' span
-        let Token { span, .. } = self.cursor.take_previous()?;
+        let Token { span, .. } = self.state.take_previous()?;
 
         // consume '('
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftParen,
             "Expected a parenthesised condition after an if statement.",
         )?;
         // parse condition
         let cond_expr = self.parse_one_expression()?;
         // consume ')'
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftParen,
             "Expected a closing after an 'if' condition.",
         )?;
         // parse then branch
-        if !self.cursor.matches(TokenKind::LeftBrace)? {
+        if !self.state.matches(TokenKind::LeftBrace)? {
             return Err(ParseError::ExpectedExpression(
                 "Expect a 'then' branch after an if condition (eg: '{')",
             ));
@@ -416,20 +428,22 @@ impl<'input> StmtParser<'input> {
         let then_block = self.block_statement()?;
 
         // case with no `else` branch
-        if !self.cursor.matches(TokenKind::Else)? {
+        if !self.state.matches(TokenKind::Else)? {
             return Ok(Stmt {
+                id: self.state.new_node_id(),
                 kind: StmtKind::If(Box::new(cond_expr), Box::new(then_block), None),
                 span,
             });
         }
 
         // consume '{'
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftParen,
             "Expected a '{' after an else statement.",
         )?;
         let else_block = self.block_statement()?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             kind: StmtKind::If(
                 Box::new(cond_expr),
                 Box::new(then_block),
@@ -440,23 +454,23 @@ impl<'input> StmtParser<'input> {
     }
 
     fn parse_one_expression(&mut self) -> Result<Expr, ParseError> {
-        let mut expression_parser = ExprParser::new(&mut self.cursor);
+        let mut expression_parser = ExprParser::new(&mut self.state);
         expression_parser.parse()
     }
 
     fn parse_function_args(&mut self) -> Result<Vec<String>, ParseError> {
         // parse arguments
         let mut arguments: Vec<String> = Vec::new();
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftParen,
             "Expected '(' after function declaration.",
         )?;
-        while !self.cursor.matches(TokenKind::RightParen)? {
-            self.cursor.advance()?;
+        while !self.state.matches(TokenKind::RightParen)? {
+            self.state.advance()?;
             let Token {
                 kind: TokenKind::Identifier(arg_name),
                 ..
-            } = self.cursor.take_previous()?
+            } = self.state.take_previous()?
             else {
                 return Err(ParseError::ExpectedToken(
                     "expected identifier in function arguments.",
@@ -464,24 +478,24 @@ impl<'input> StmtParser<'input> {
             };
             arguments.push(arg_name);
 
-            if self.cursor.check(TokenKind::Comma)? {
-                self.cursor.advance()?;
+            if self.state.check(TokenKind::Comma)? {
+                self.state.advance()?;
             }
         }
         Ok(arguments)
     }
 
     fn parse_function_body(&mut self) -> Result<Vec<Stmt>, ParseError> {
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::LeftBrace,
             "Expected function body after arguments in function declaration.",
         )?;
         let mut statements: Vec<Stmt> = Vec::new();
-        while !self.cursor.check(TokenKind::RightBrace)? {
+        while !self.state.check(TokenKind::RightBrace)? {
             let stmt = self.declaration()?;
             statements.push(stmt);
         }
-        self.cursor
+        self.state
             .consume(TokenKind::RightBrace, "Expected '}' after function body.")?;
         Ok(statements)
     }
@@ -492,11 +506,12 @@ impl<'input> StmtParser<'input> {
         'input: 'parser,
     {
         let expr = self.parse_one_expression()?;
-        self.cursor.consume(
+        self.state.consume(
             TokenKind::Semicolon,
             "Expected ';' add the end of statement.",
         )?;
         Ok(Stmt {
+            id: self.state.new_node_id(),
             span: expr.span.clone(),
             kind: StmtKind::Expr(Box::new(expr)),
         })
@@ -507,21 +522,21 @@ impl<'input> StmtParser<'input> {
     where
         'input: 'parser,
     {
-        self.cursor.advance()?;
+        self.state.advance()?;
 
         let mut statements = Vec::new();
         loop {
-            if self.cursor.matches(TokenKind::Eof)? {
+            if self.state.matches(TokenKind::Eof)? {
                 break;
             }
             // parse declaration, forward
-            // errors (if any) and move the token cursor to the next
+            // errors (if any) and move the token state to the next
             // statement. (allow recovery in REPL environment)
             match self.declaration() {
                 Err(e) => {
-                    let span = self.cursor.current_position();
+                    let span = self.state.current_position();
                     dbg!("error at {:?}", span);
-                    self.cursor.move_to_next_stmt();
+                    self.state.move_to_next_stmt();
                     return Err(e);
                 }
                 Ok(stmt) => statements.push(stmt),
