@@ -22,50 +22,46 @@ pub enum MathOp {
 }
 
 pub enum Constraint {
-    IsNumOrStr,
-    IsNum,
-    IsStr,
-    IsBool,
-    IsNil,
+    IsNumOrStr(NodeId),
+    IsNum(NodeId),
+    IsStr(NodeId),
+    IsBool(NodeId),
+    IsNil(NodeId),
     // a function callable with types equivalent at those
-    IsCallableWith(Box<[NodeId]>),
+    IsCallableWith(NodeId, Box<[NodeId]>),
     // Exect match
-    SameAs(NodeId),
+    Same(NodeId, NodeId),
     // equivalent to
-    EqTo(NodeId),
+    Equivalent(NodeId, NodeId),
     // handle `a = b or c`, 
     // `a` can have both type depending of the runtime value
-    IsEither(NodeId, NodeId),
-    ReturnTypeOf(SymbolId),
-    IsClass(SymbolId),
-    HasAttr(String),
+    IsEither(NodeId, NodeId, NodeId),
+    //ReturnTypeOf(NonSymbolId),
+    //IsClass(SymbolId),
+    //HasAttr(String),
 }
 
 struct ConstraintStore {
-    // node ids are sorted, and contiguous node ids are often
-    // read together so i expect that a btreemap is a nice fit for this
-    // read/write pattern.
-    // If performance somehow becomes an issue, we could use a flat array.
-    constraints: BTreeMap<NodeId, Vec<Constraint>>,
+    constraints: Vec<Constraint>,
 }
 impl ConstraintStore {
     pub fn new() -> Self {
         Self {
-            constraints: BTreeMap::new(),
+            constraints: Vec::new(),
         }
     }
 
     pub fn get(&self, node_id: NodeId) -> Option<&[Constraint]> {
-        None
+        todo!()
     }
 
-    pub fn add(&mut self, node_id: NodeId, constraint: Constraint) {
-        let mut set = self.constraints.entry(node_id).or_insert_with(Vec::new);
-        set.push(constraint)
+    pub fn add(&mut self, constraint: Constraint) {
+        self.constraints.push(constraint)
     }
 }
 
 fn collect_binary_expression_constraints(
+    binary_id: NodeId,
     left: &Expr<Sym>,
     kind: &BinaryExprKind,
     right: &Expr<Sym>,
@@ -78,20 +74,20 @@ fn collect_binary_expression_constraints(
         // both operands can only be either strings or numbers
         // _and_ are equivalent
         Add => {
-            store.add(left.id, EqTo(right.id));
-            store.add(right.id, EqTo(left.id));
-            store.add(left.id, IsNumOrStr);
-            store.add(right.id, IsNumOrStr);
+            store.add(Same(left.id, right.id));
+            store.add(IsNumOrStr(left.id));
+            store.add(Same(binary_id, left.id));
         }
         // both operands are numbers
         LessEqual | Less | GreaterEqual | Greater | Sub | Div | Mul => {
-            store.add(left.id, IsNum);
-            store.add(right.id, IsNum);
+            store.add(IsNum(left.id));
+            store.add(IsNum(right.id));
+            store.add(IsBool(binary_id));
         }
         // both operands are equivalents
         NotEqual | Equal => {
-            store.add(left.id, EqTo(right.id));
-            store.add(right.id, EqTo(left.id));
+            store.add(Same(left.id, right.id));
+            store.add(IsBool(binary_id));
         }
     }
     Ok(())
@@ -111,9 +107,9 @@ fn collect_expression_constraints<'set>(
         // for Nil, we can't decide anything.
         Literal(literal_kind) => {
             match &literal_kind {
-                LiteralKind::Num(..) => store.add(expr.id, IsNum),
-                LiteralKind::Str(..) => store.add(expr.id, IsStr),
-                LiteralKind::Bool(..) => store.add(expr.id, IsBool),
+                LiteralKind::Num(..) => store.add(IsNum(expr.id)),
+                LiteralKind::Str(..) => store.add(IsStr(expr.id)),
+                LiteralKind::Bool(..) => store.add(IsBool(expr.id)),
                 LiteralKind::Nil => {}
             };
         }
@@ -124,28 +120,28 @@ fn collect_expression_constraints<'set>(
             match &kind {
                 UnaryExprKind::Not => {
                     // the `!exp` is a boolean
-                    store.add(expr.id, IsBool);
                     // anything can be casted as a boolean
                     // so it doesn't give us any more information
+                    store.add(IsBool(expr.id));
                 }
                 UnaryExprKind::Minus => {
                     // both the current expression and the innner one are numbers
-                    store.add(expr.id, IsNum);
-                    store.add(inner_expr.id, IsNum);
+                    store.add(IsNum(expr.id));
+                    store.add(IsNum(inner_expr.id));
                 }
             };
         }
         Binary(left, kind, right) => {
-            collect_binary_expression_constraints(left, kind, right, store)?
+            collect_binary_expression_constraints(expr.id, left, kind, right, store)?
         }
         Logical(left, _kind, right) => {
             // the type of the binary expression itself depends ?
             // are ternaries expressions allowed ?
-            store.add(expr.id, IsEither(left.id, right.id));
+            store.add(IsEither(expr.id, left.id, right.id));
         }
         Grouping(inner_expr) => {
             // the inner node as the exact same type as its child
-            store.add(expr.id, SameAs(inner_expr.id)); 
+            store.add(Same(expr.id, inner_expr.id)); 
         }
         Call(callee_expr, args) => todo!(),
         Assign(bind_name, r_value_expr) => todo!(),
