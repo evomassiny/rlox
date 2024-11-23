@@ -2,8 +2,8 @@ use super::ast::{
     Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, Stmt as GenericStmt,
     StmtKind as GenericStmtKind,
 };
-use super::parser_state::{ParserState, ParseError};
 use super::expr_parser::ExprParser;
+use super::parser_state::{ParseError, ParserState};
 use lexer::{Token, TokenKind, Tokenize};
 
 // in this file, use simply use

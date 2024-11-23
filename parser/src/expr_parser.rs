@@ -2,7 +2,7 @@ use super::ast::{
     BinaryExprKind, Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, LogicalExprKind,
     UnaryExprKind,
 };
-use super::parser_state::{ParserState, ParseError};
+use super::parser_state::{ParseError, ParserState};
 use lexer::{Token, TokenKind};
 
 // in this file, use simply use
@@ -65,7 +65,10 @@ where
 
     /// Parse all encountered expressions until we reach
     /// a token associated with a binding power lower than `precedence`
-    fn parse_precedence(state: &mut ParserState, precedence: Precedence) -> Result<Expr, ParseError> {
+    fn parse_precedence(
+        state: &mut ParserState,
+        precedence: Precedence,
+    ) -> Result<Expr, ParseError> {
         state.advance()?;
         let prefix_fn = Self::get_prefix_handler(&state.previous()?.kind)
             .ok_or(ParseError::ExpectedExpression("Expected an expression"))?;
@@ -405,7 +408,11 @@ where
 
     /// Build an 'and' logical expression,
     /// (assumes an 'and' token has just been parsed)
-    fn parse_and(state: &mut ParserState, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_and(
+        state: &mut ParserState,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token { span, .. } = state.take_previous()?;
         let rhs = Self::parse_precedence(state, Precedence::Equality)?;
         Ok(Expr {
@@ -439,7 +446,11 @@ where
 
     /// Build an 'equal' comparison expression,
     /// (assumes a '== token has just been parsed)
-    fn parse_equal(state: &mut ParserState, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_equal(
+        state: &mut ParserState,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::Equal)
     }
 
@@ -455,7 +466,11 @@ where
 
     /// Build an 'less' comparison expression,
     /// (assumes a '<' token has just been parsed)
-    fn parse_less(state: &mut ParserState, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_less(
+        state: &mut ParserState,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::Less)
     }
 
@@ -481,7 +496,11 @@ where
 
     /// Build a sum,
     /// (assumes a '+' token has just been parsed)
-    fn parse_sum(state: &mut ParserState, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_sum(
+        state: &mut ParserState,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         Self::parse_binary_expression(state, lhs, Precedence::Factor, BinaryExprKind::Add)
     }
 
@@ -589,7 +608,7 @@ where
 mod parsing {
     use super::{Expr, ExprKind, ExprParser};
     use crate::ast::{BinaryExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
-    use crate::parser_state::{ParserState, ParseError};
+    use crate::parser_state::{ParseError, ParserState};
     use lexer::{Lexer, StrPeeker};
 
     fn parse_expression(src: &str) -> Result<Expr, ParseError> {

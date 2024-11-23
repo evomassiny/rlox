@@ -1,7 +1,7 @@
 use super::scopes::{Globals, ScopeChain, ScopeKind};
 use super::symbols::{Sym, Symbol, SymbolId, SymbolTable};
 use lexer::Span;
-use parser::{Expr, ExprKind, Stmt, StmtKind, NodeId};
+use parser::{Expr, ExprKind, NodeId, Stmt, StmtKind};
 
 #[derive(Debug)]
 pub enum NameError {

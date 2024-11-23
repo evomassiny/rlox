@@ -1,5 +1,5 @@
-use lexer::{LexerError, Span, Token, TokenKind, Tokenize};
 use super::ast::NodeId;
+use lexer::{LexerError, Span, Token, TokenKind, Tokenize};
 
 #[derive(Debug)]
 pub enum ParseError {
