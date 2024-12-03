@@ -1,8 +1,7 @@
 use super::TypeTable;
-use parser::{Expr, ExprKind, LiteralKind, NodeId, Stmt, StmtKind, BinaryExprKind, UnaryExprKind, LogicalExprKind};
-use resolver::{Ast, Sym, SymbolId};
+use parser::{Expr, ExprKind, LiteralKind, NodeId, Stmt, StmtKind, BinaryExprKind, UnaryExprKind};
+use resolver::{Ast, Sym};
 
-use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub enum TypeError {}
@@ -21,6 +20,11 @@ pub enum MathOp {
     Div,
 }
 
+/// Constraints are properties of 
+/// expression nodes that must be kept when
+/// picking the correct type for an expression.
+/// 
+/// They are tied to AST nodes, identified by their `NodeId`.
 pub enum Constraint {
     IsNumOrStr(NodeId),
     IsNum(NodeId),
@@ -114,8 +118,8 @@ fn collect_expression_constraints<'set>(
             };
         }
         // 2 cases:
-        // * `!exp`: exp can be evaluated as a boolean
-        // * `-exp`: exp can be evaluated as a number
+        // * `!exp`: exp can be evaluated as a boolean, but anything can.
+        // * `-exp`: `-exp` is a number, so is `exp`
         Unary(kind, inner_expr) => {
             match &kind {
                 UnaryExprKind::Not => {
@@ -135,8 +139,7 @@ fn collect_expression_constraints<'set>(
             collect_binary_expression_constraints(expr.id, left, kind, right, store)?
         }
         Logical(left, _kind, right) => {
-            // the type of the binary expression itself depends ?
-            // are ternaries expressions allowed ?
+            // the type of the binary expression itself depends of the evaluation,
             store.add(IsEither(expr.id, left.id, right.id));
         }
         Grouping(inner_expr) => {
@@ -159,7 +162,7 @@ fn collect_constraints_in_stmt<'set>(
     set: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
     use StmtKind::*;
-    use Constraint::*;
+    
     match &stmt.kind {
         Block(stmts) => todo!(),
         Class(name, maybe_super_name, methods) => todo!(),

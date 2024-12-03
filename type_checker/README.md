@@ -1,6 +1,8 @@
 # About
 
-see https://github.com/roc-lang/roc/blob/22423ca98bef41e2f55ae54e11c632bd0610c241/crates/compiler/solve/src/solve.rs
+Ressources:
+* the type checker of [roc-lang](https://github.com/roc-lang/roc/blob/22423ca98bef41e2f55ae54e11c632bd0610c241/crates/compiler/solve/src/solve.rs)
+* the 3rd chapter of [static program analysis](https://cs.au.dk/~amoeller/spa/)
 
 The type checker does 2 main passes:
 
