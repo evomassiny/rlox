@@ -53,7 +53,9 @@ impl<T: Read> ReaderPeeker<T> {
                 // SAFETY: safe because we know those are valid chars,
                 // we just parsed them
                 unsafe {
-                    let valid = std::str::from_utf8_unchecked(&self.parse_buffer[..count]);
+                    let valid = std::str::from_utf8_unchecked(
+                        &self.parse_buffer[..count],
+                    );
                     for c in valid.chars() {
                         let _ = self.chars.append(c);
                     }

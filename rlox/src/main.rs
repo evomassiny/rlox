@@ -54,7 +54,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(error) => match error {
             ParseError::ExpectedToken(msg) => panic!("Missing token {:?}", msg),
             ParseError::ScanningError(e) => panic!("Lexing error {:?}", e),
-            ParseError::ExpectedExpression(msg) => panic!("missing expression: {:?}", msg),
+            ParseError::ExpectedExpression(msg) => {
+                panic!("missing expression: {:?}", msg)
+            }
             ParseError::Starved => panic!("File ended too soon !"),
         },
     };

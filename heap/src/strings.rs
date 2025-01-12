@@ -10,7 +10,8 @@ use std::ptr::{addr_of, addr_of_mut};
 /// relative to the start of an `Str` struct.
 /// (This works because of #[repr(C)])
 const OFFSET_TO_HEADER: usize = 0;
-const OFFSET_TO_LENGTH: usize = OFFSET_TO_HEADER + padded_offset::<Header, usize>();
+const OFFSET_TO_LENGTH: usize =
+    OFFSET_TO_HEADER + padded_offset::<Header, usize>();
 const OFFSET_TO_BUFFER: usize = OFFSET_TO_LENGTH + padded_offset::<usize, u8>();
 
 /// data is written directly after `length`
@@ -26,9 +27,13 @@ pub struct Str {
 }
 
 impl Str {
-    pub fn new<'heap, 'a>(heap: &'heap mut Heap, value: &str) -> Result<&'a mut Self, MemoryError> {
+    pub fn new<'heap, 'a>(
+        heap: &'heap mut Heap,
+        value: &str,
+    ) -> Result<&'a mut Self, MemoryError> {
         let bytes = value.as_bytes();
-        let size: usize = OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
+        let size: usize =
+            OFFSET_TO_BUFFER + bytes.len() * std::mem::size_of::<u8>();
         let ptr = heap.alloc(size)?;
         unsafe {
             let mut string = ptr.as_ptr().cast::<Self>();
@@ -68,5 +73,10 @@ impl Markable for Str {
     }
 
     /// Str does not reference any other data, so this is a NO-OP
-    fn replace_reference(&mut self, _old_ref: *const Header, _new_ref: *const Header) {}
+    fn replace_reference(
+        &mut self,
+        _old_ref: *const Header,
+        _new_ref: *const Header,
+    ) {
+    }
 }

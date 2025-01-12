@@ -27,7 +27,9 @@ pub struct Lexer<T> {
 impl Lexer<ReaderPeeker<File>> {
     /// build a Lexer from a file,
     /// the lexer will lazyly parse as utf-8 the file content when needed.
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_path(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             input: SourceInput::from_path(path)?,
         })

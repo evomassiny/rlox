@@ -60,7 +60,8 @@ impl HeapCompactor {
             // free lines in block _below_ `threshold_cursor`.
             cumulative_free_count -= free_count_by_hole_count[thresold_cursor];
             // full lines in block _over_ `threshold_cursor`.
-            cumulative_full_count += self.marked_lines_by_holes_count[thresold_cursor];
+            cumulative_full_count +=
+                self.marked_lines_by_holes_count[thresold_cursor];
 
             // stop if the evacuated block data cannot fit in
             // the rest of blocks.
@@ -75,7 +76,9 @@ impl HeapCompactor {
             for block in memory.blocks.iter_mut() {
                 let header = block.header_mut();
                 header.state = match header.state {
-                    BlockState::PartiallyFull { hole_count, .. } if hole_count >= threshold => {
+                    BlockState::PartiallyFull { hole_count, .. }
+                        if hole_count >= threshold =>
+                    {
                         BlockState::Evacuating
                     }
                     state => state,
@@ -101,7 +104,11 @@ impl HeapCompactor {
 
     /// TODO:
     /// * evacuate objects from Blocks in `Evacuating` state.
-    pub fn mark_and_compact(&self, value: &Value, memory: &mut Memory) -> Result<(), MemoryError> {
+    pub fn mark_and_compact(
+        &self,
+        value: &Value,
+        memory: &mut Memory,
+    ) -> Result<(), MemoryError> {
         let mut refs: Vec<ObjectRef> = Vec::new();
 
         value.collect_references(&mut refs);
@@ -122,7 +129,8 @@ impl HeapCompactor {
                 // if the block containing the object is marked as "Evacuating",
                 // move the object into a new block.
                 if matches!(block_header.state, BlockState::Evacuating) {
-                    let new_location = memory.evacuate((*obj_header).object_size_in_bytes())?;
+                    let new_location = memory
+                        .evacuate((*obj_header).object_size_in_bytes())?;
                     // copy old object to new location
                     std::ptr::copy_nonoverlapping(
                         obj_header.cast::<u8>(),
@@ -148,22 +156,28 @@ impl HeapCompactor {
                         let boxed_value = obj_header.cast::<BoxedValue>();
                         (*boxed_value).collect_references(&mut refs);
                         // mark
-                        block_header.mark_lines(obj_header, (*boxed_value).size_in_bytes());
+                        block_header.mark_lines(
+                            obj_header,
+                            (*boxed_value).size_in_bytes(),
+                        );
                     }
                     Object::List => {
                         let list = obj_header.cast::<List>();
                         (*list).collect_references(&mut refs);
-                        block_header.mark_lines(obj_header, (*list).size_in_bytes());
+                        block_header
+                            .mark_lines(obj_header, (*list).size_in_bytes());
                     }
                     Object::Array => {
                         // here we don't know the type of Array item,
                         // but we don't access them, so we don't care.
                         let array = obj_header.cast::<Array<()>>();
-                        block_header.mark_lines(obj_header, (*array).size_in_bytes());
+                        block_header
+                            .mark_lines(obj_header, (*array).size_in_bytes());
                     }
                     Object::Str => {
                         let string = obj_header.cast::<Str>();
-                        block_header.mark_lines(obj_header, (*string).size_in_bytes());
+                        block_header
+                            .mark_lines(obj_header, (*string).size_in_bytes());
                     }
                     Object::Tombstone => {
                         // swap references in `origin`

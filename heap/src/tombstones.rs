@@ -42,7 +42,8 @@ impl Markable for Tombstone {
         // SAFETY:
         // safe because both &self and self.object_ptr are non Null
         unsafe {
-            let self_ptr = Some(NonNull::new_unchecked(self as *const _ as *mut Header));
+            let self_ptr =
+                Some(NonNull::new_unchecked(self as *const _ as *mut Header));
             object_ptrs.push(ObjectRef {
                 origin: self_ptr,
                 dest: NonNull::new_unchecked(self.object_ptr.cast_mut()),
@@ -57,7 +58,11 @@ impl Markable for Tombstone {
 
     /// Replace a given reference by a new one.
     /// (Usefull when "evacutation" occurs)
-    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header) {
+    fn replace_reference(
+        &mut self,
+        old_ref: *const Header,
+        new_ref: *const Header,
+    ) {
         // NOTE: I'm not sure about this one,
         // how a tombstone could point to another one ?
         // anyway, in such cases, I don't see why we couldn't update `self.object_ptr`

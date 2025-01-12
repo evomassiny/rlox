@@ -1,6 +1,6 @@
 use super::ast::{
-    Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, Stmt as GenericStmt,
-    StmtKind as GenericStmtKind,
+    Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind,
+    Stmt as GenericStmt, StmtKind as GenericStmtKind,
 };
 use super::expr_parser::ExprParser;
 use super::parser_state::{ParseError, ParserState};
@@ -120,8 +120,10 @@ impl<'input> StmtParser<'input> {
 
         // parse next expression
         let expr = self.parse_one_expression()?;
-        self.state
-            .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
+        self.state.consume(
+            TokenKind::Semicolon,
+            "Expected ';' after print statement.",
+        )?;
 
         match expr {
             // case with no initializer
@@ -318,12 +320,17 @@ impl<'input> StmtParser<'input> {
         let condition_expression = self.parse_one_expression()?;
         self.state
             .consume(TokenKind::RightBrace, "Expected ')' after 'while'.")?;
-        self.state
-            .consume(TokenKind::LeftBrace, "Expected '{' after while condition.")?;
+        self.state.consume(
+            TokenKind::LeftBrace,
+            "Expected '{' after while condition.",
+        )?;
         let stmt = self.block_statement()?;
         Ok(Stmt {
             id: self.state.new_node_id(),
-            kind: StmtKind::While(Box::new(condition_expression), Box::new(stmt)),
+            kind: StmtKind::While(
+                Box::new(condition_expression),
+                Box::new(stmt),
+            ),
             span,
         })
     }
@@ -375,7 +382,12 @@ impl<'input> StmtParser<'input> {
         let block = self.block_statement()?;
         Ok(Stmt {
             id: self.state.new_node_id(),
-            kind: StmtKind::For(initializer, condition, increment, Box::new(block)),
+            kind: StmtKind::For(
+                initializer,
+                condition,
+                increment,
+                Box::new(block),
+            ),
             span,
         })
     }
@@ -390,8 +402,10 @@ impl<'input> StmtParser<'input> {
 
         // parse following expression
         let expr = self.parse_one_expression()?;
-        self.state
-            .consume(TokenKind::Semicolon, "Expected ';' after print statement.")?;
+        self.state.consume(
+            TokenKind::Semicolon,
+            "Expected ';' after print statement.",
+        )?;
 
         Ok(Stmt {
             id: self.state.new_node_id(),
@@ -431,7 +445,11 @@ impl<'input> StmtParser<'input> {
         if !self.state.matches(TokenKind::Else)? {
             return Ok(Stmt {
                 id: self.state.new_node_id(),
-                kind: StmtKind::If(Box::new(cond_expr), Box::new(then_block), None),
+                kind: StmtKind::If(
+                    Box::new(cond_expr),
+                    Box::new(then_block),
+                    None,
+                ),
                 span,
             });
         }
@@ -495,13 +513,17 @@ impl<'input> StmtParser<'input> {
             let stmt = self.declaration()?;
             statements.push(stmt);
         }
-        self.state
-            .consume(TokenKind::RightBrace, "Expected '}' after function body.")?;
+        self.state.consume(
+            TokenKind::RightBrace,
+            "Expected '}' after function body.",
+        )?;
         Ok(statements)
     }
 
     /// parse an expression followed by a semicolon.
-    fn expression_statement<'parser>(&'parser mut self) -> Result<Stmt, ParseError>
+    fn expression_statement<'parser>(
+        &'parser mut self,
+    ) -> Result<Stmt, ParseError>
     where
         'input: 'parser,
     {
@@ -738,7 +760,13 @@ mod stmt_parsing {
         let src = "for (1; 2; 3) {}";
         let mut ast = parse_statement(src).unwrap();
         let Some(Stmt {
-            kind: StmtKind::For(Some(initializer), Some(condition), Some(increment), _block),
+            kind:
+                StmtKind::For(
+                    Some(initializer),
+                    Some(condition),
+                    Some(increment),
+                    _block,
+                ),
             ..
         }) = ast.pop()
         else {
@@ -769,7 +797,8 @@ mod stmt_parsing {
         let src = "for (1; ; 3) {}";
         let mut ast = parse_statement(src).unwrap();
         let Some(Stmt {
-            kind: StmtKind::For(Some(initializer), None, Some(increment), _block),
+            kind:
+                StmtKind::For(Some(initializer), None, Some(increment), _block),
             ..
         }) = ast.pop()
         else {
@@ -784,7 +813,8 @@ mod stmt_parsing {
         let src = "for (1; 2; ) {}";
         let mut ast = parse_statement(src).unwrap();
         let Some(Stmt {
-            kind: StmtKind::For(Some(initializer), Some(condition), None, _block),
+            kind:
+                StmtKind::For(Some(initializer), Some(condition), None, _block),
             ..
         }) = ast.pop()
         else {

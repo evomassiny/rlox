@@ -31,7 +31,10 @@ pub(crate) struct Array<T> {
 }
 
 impl<T: Sized> Array<T> {
-    pub fn new<'a, 'b>(heap: &'a mut Heap, array_len: usize) -> Result<&'b mut Self, MemoryError> {
+    pub fn new<'a, 'b>(
+        heap: &'a mut Heap,
+        array_len: usize,
+    ) -> Result<&'b mut Self, MemoryError> {
         let offset_to_buffer: usize = padded_offset::<Header, usize>()    // header size + padding to `full_size`
             + padded_offset::<usize, T>(); // `full_size` size + padding to buffer
         let size = offset_to_buffer + array_len * std::mem::size_of::<T>();
@@ -90,5 +93,10 @@ impl<T> Markable for Array<T> {
     }
 
     /// NO-OP because arrays only contains weak refs
-    fn replace_reference(&mut self, _old_ref: *const Header, _new_ref: *const Header) {}
+    fn replace_reference(
+        &mut self,
+        _old_ref: *const Header,
+        _new_ref: *const Header,
+    ) {
+    }
 }

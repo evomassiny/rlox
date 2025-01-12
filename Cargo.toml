@@ -6,5 +6,5 @@ members = [
   "type_checker",
   "resolver",
   "rlox", 
-  "control_flow_graph",
+  #"control_flow_graph",
 ]

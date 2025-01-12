@@ -1,4 +1,6 @@
-use crate::blocks::{BlockOffset, BLOCK_SIZE, LINE_COUNT, LINE_SIZE, LINE_SIZE_BITS};
+use crate::blocks::{
+    BlockOffset, BLOCK_SIZE, LINE_COUNT, LINE_SIZE, LINE_SIZE_BITS,
+};
 use crate::heap_objects::Header;
 use std::mem::size_of;
 
@@ -80,7 +82,9 @@ impl BlockHeader {
     /// the lifetime of the returned value is not actually 'static,
     /// it is tied to the lifetime of its block.
     /// But the compiler does not know that.
-    pub(crate) unsafe fn from_object_ptr(ptr: *const Header) -> &'static mut BlockHeader {
+    pub(crate) unsafe fn from_object_ptr(
+        ptr: *const Header,
+    ) -> &'static mut BlockHeader {
         // Because blocks are aligned on their size,
         // removing the lower bit of an alloacted object
         // will return the addr of the header it belongs to.
@@ -90,7 +94,11 @@ impl BlockHeader {
         &mut *block_header_ptr
     }
 
-    pub(crate) fn mark_lines(&mut self, object_ptr: *const Header, object_size: usize) {
+    pub(crate) fn mark_lines(
+        &mut self,
+        object_ptr: *const Header,
+        object_size: usize,
+    ) {
         // because block are aligned, lower bits are equivalent to  byte offset.
         let byte_offset = (object_ptr as usize) & MASK_UPPER_BLOCK_BITS;
         // get line indices
@@ -144,7 +152,9 @@ impl BlockHeader {
         const DATA_LINE_COUNT: usize = LINE_COUNT - BLOCK_HEADER_SIZE_IN_LINE;
         self.state = match self.count_holes_and_marked_lines() {
             (0, _) => BlockState::Full,
-            (1, mark_count) if mark_count == DATA_LINE_COUNT => BlockState::Free,
+            (1, mark_count) if mark_count == DATA_LINE_COUNT => {
+                BlockState::Free
+            }
             (hole_count, mark_count) => BlockState::PartiallyFull {
                 hole_count,
                 mark_count,
@@ -158,7 +168,9 @@ fn block_header_size() {
     // just so i don't forget to maintain the `BLOCK_HEADER_SIZE_IN_LINE` const.
     // If its not right, resetting the BlockHeader mutate the first object
     // stored in the block, with leads to confusing errors.
-    assert!(size_of::<BlockHeader>() <= (LINE_SIZE * BLOCK_HEADER_SIZE_IN_LINE));
+    assert!(
+        size_of::<BlockHeader>() <= (LINE_SIZE * BLOCK_HEADER_SIZE_IN_LINE)
+    );
 }
 
 #[test]
@@ -204,7 +216,8 @@ fn holes_and_marks_count() {
     block_header.line_marks[20] = true;
     block_header.line_marks[21] = true;
 
-    let (hole_count, marked_count) = block_header.count_holes_and_marked_lines();
+    let (hole_count, marked_count) =
+        block_header.count_holes_and_marked_lines();
     // in total we should expect 3 holes
     // * start to line 10
     // * line 12 to line 20

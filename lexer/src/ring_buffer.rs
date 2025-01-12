@@ -76,7 +76,10 @@ impl<const SIZE: usize, T: Copy> RingBuffer<SIZE, T> {
 impl<const SIZE: usize> RingBuffer<SIZE, u8> {
     /// Fill the remaining empty slots of self,
     /// by reading data from a reader.
-    pub fn fill<R: Read>(&mut self, reader: &mut R) -> Result<usize, Box<dyn std::error::Error>> {
+    pub fn fill<R: Read>(
+        &mut self,
+        reader: &mut R,
+    ) -> Result<usize, Box<dyn std::error::Error>> {
         if self.length == SIZE {
             return Ok(0);
         }

@@ -1,7 +1,9 @@
 use super::TypeTable;
-use parser::{Expr, ExprKind, LiteralKind, NodeId, Stmt, StmtKind, BinaryExprKind, UnaryExprKind};
+use parser::{
+    BinaryExprKind, Expr, ExprKind, LiteralKind, NodeId, Stmt, StmtKind,
+    UnaryExprKind,
+};
 use resolver::{Ast, Sym};
-
 
 #[derive(Debug)]
 pub enum TypeError {}
@@ -20,10 +22,10 @@ pub enum MathOp {
     Div,
 }
 
-/// Constraints are properties of 
+/// Constraints are properties of
 /// expression nodes that must be kept when
 /// picking the correct type for an expression.
-/// 
+///
 /// They are tied to AST nodes, identified by their `NodeId`.
 pub enum Constraint {
     IsNumOrStr(NodeId),
@@ -32,15 +34,15 @@ pub enum Constraint {
     IsBool(NodeId),
     IsNil(NodeId),
     // a function callable with types equivalent at those
-    IsCallableWith(NodeId, Box<[NodeId]>),
-    // Exect match
+    IsCallableWith(NodeId, Vec<NodeId>),
+    // Exact match
     Same(NodeId, NodeId),
     // equivalent to
     Equivalent(NodeId, NodeId),
-    // handle `a = b or c`, 
+    // handle `a = b or c`,
     // `a` can have both type depending of the runtime value
     IsEither(NodeId, NodeId, NodeId),
-    //ReturnTypeOf(NonSymbolId),
+    ReturnTypeOf(NodeId),
     //IsClass(SymbolId),
     //HasAttr(String),
 }
@@ -135,19 +137,29 @@ fn collect_expression_constraints<'set>(
                 }
             };
         }
-        Binary(left, kind, right) => {
-            collect_binary_expression_constraints(expr.id, left, kind, right, store)?
-        }
+        Binary(left, kind, right) => collect_binary_expression_constraints(
+            expr.id, left, kind, right, store,
+        )?,
         Logical(left, _kind, right) => {
             // the type of the binary expression itself depends of the evaluation,
             store.add(IsEither(expr.id, left.id, right.id));
         }
         Grouping(inner_expr) => {
             // the inner node as the exact same type as its child
-            store.add(Same(expr.id, inner_expr.id)); 
+            store.add(Same(expr.id, inner_expr.id));
         }
-        Call(callee_expr, args) => todo!(),
-        Assign(bind_name, r_value_expr) => todo!(),
+        Call(callee_expr, args) => {
+            // We known that "callee_expr" is a function.
+            // which should be callable with those args
+            let arg_ids = args.iter().map(|arg| arg.id ).collect();
+            store.add(IsCallableWith(callee_expr.id, arg_ids));
+            // we also know that the call expression
+            // has the type of the return value of the expression.
+            store.add(ReturnTypeOf(callee_expr.id));
+        },
+        Assign(bind_name, r_value_expr) => {
+
+        },
         Variable(bind_name) => todo!(),
         Get(object_expr, attr_name) => todo!(),
         Set(object_expr, attr_name, r_value_expr) => todo!(),
@@ -162,7 +174,7 @@ fn collect_constraints_in_stmt<'set>(
     set: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
     use StmtKind::*;
-    
+
     match &stmt.kind {
         Block(stmts) => todo!(),
         Class(name, maybe_super_name, methods) => todo!(),
@@ -173,7 +185,9 @@ fn collect_constraints_in_stmt<'set>(
         Return(maybe_expr) => todo!(),
         Var(name, intializer) => todo!(),
         While(condition, body) => todo!(),
-        For(maybe_initializer, maybe_condition, maybe_increment, body) => todo!(),
+        For(maybe_initializer, maybe_condition, maybe_increment, body) => {
+            todo!()
+        }
     };
     Ok(())
 }

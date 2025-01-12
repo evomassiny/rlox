@@ -28,7 +28,12 @@ impl Globals {
     }
 
     /// register a global (alongside its span)
-    pub fn add(&mut self, name: String, src: Span, table: &mut SymbolTable) -> SymbolId {
+    pub fn add(
+        &mut self,
+        name: String,
+        src: Span,
+        table: &mut SymbolTable,
+    ) -> SymbolId {
         let symbol_id = table.add(name.clone(), src);
 
         self.symbols
@@ -40,7 +45,12 @@ impl Globals {
 
     /// lookup for the last global variable
     /// named `name` defined before `src`.
-    pub fn resolve_precise(&self, name: &str, src: &Span, table: &SymbolTable) -> Option<SymbolId> {
+    pub fn resolve_precise(
+        &self,
+        name: &str,
+        src: &Span,
+        table: &SymbolTable,
+    ) -> Option<SymbolId> {
         let mut last: Option<SymbolId> = None;
         if let Some(globals) = self.symbols.get(name) {
             for global_id in globals {
@@ -92,7 +102,12 @@ impl Scope {
         }
     }
 
-    pub fn add(&mut self, name: String, src: Span, table: &mut SymbolTable) -> SymbolId {
+    pub fn add(
+        &mut self,
+        name: String,
+        src: Span,
+        table: &mut SymbolTable,
+    ) -> SymbolId {
         let id = table.add(name.clone(), src);
         self.symbols.insert(name, id);
         id
@@ -142,19 +157,24 @@ impl<'table> ScopeChain<'table> {
             Some(scope) => scope.add(name, src, self.symbols),
             // We could append the binding directly into the global scope,
             // _but_ it should have been previously resolved, in a dedicated pass
-            None => match self.globals.resolve_precise(&name, &src, self.symbols) {
-                Some(symbol_id) => symbol_id,
-                None => {
-                    unreachable!("the global binding '{name}' should have already been resolved")
+            None => {
+                match self.globals.resolve_precise(&name, &src, self.symbols) {
+                    Some(symbol_id) => symbol_id,
+                    None => {
+                        unreachable!("the global binding '{name}' should have already been resolved")
+                    }
                 }
-            },
+            }
         };
         Sym::Direct(symbol_id)
     }
 
     /// If `name` was already declared in the local scope,
     /// returns its definition location.
-    pub fn location_of_declaration_in_current_scope(&self, name: &str) -> Option<Span> {
+    pub fn location_of_declaration_in_current_scope(
+        &self,
+        name: &str,
+    ) -> Option<Span> {
         if let Some(scope) = self.chain.last() {
             if let Some(symbol_id) = scope.resolve(name) {
                 // symbol present in chain scope should always exist in the symbol table.

@@ -90,7 +90,9 @@ impl<T: PeekOffset> SourceInput<T> {
 
         match self.src.peek_at(index - self.growable_buffer.len()) {
             Ok(maybe_c) => maybe_c,
-            Err(ReadError::PeekTooFar) => unreachable!("check for buffer capacity did not work ?"),
+            Err(ReadError::PeekTooFar) => {
+                unreachable!("check for buffer capacity did not work ?")
+            }
             Err(ReadError::IoError) => {
                 panic!("IO error while reading input. can't recover from that.")
             }
@@ -99,7 +101,9 @@ impl<T: PeekOffset> SourceInput<T> {
 }
 
 impl SourceInput<ReaderPeeker<File>> {
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_path(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let file = File::open(path)?;
         let reader = ReaderPeeker::new(file);
         Ok(Self {
@@ -127,7 +131,8 @@ impl<'src, const SIZE: usize> SourceInput<StrPeeker<'src, { SIZE }>> {
 
 #[test]
 fn test_cursor() {
-    let mut cursor: SourceInput<StrPeeker<'_, 64>> = SourceInput::from_str("01");
+    let mut cursor: SourceInput<StrPeeker<'_, 64>> =
+        SourceInput::from_str("01");
     assert_eq!(cursor.peek(0), Some('0'));
     assert_eq!(cursor.peek(1), Some('1'));
     assert_eq!(cursor.peek(2), None);

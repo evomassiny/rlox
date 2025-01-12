@@ -33,7 +33,8 @@ impl<'input> ParserState<'input> {
     /// and update `self.previous` and `self.current`
     pub fn advance(&mut self) -> Result<(), ParseError> {
         self.previous = self.current.take();
-        self.current = Some(self.lexer.scan_next().map_err(ParseError::ScanningError)?);
+        self.current =
+            Some(self.lexer.scan_next().map_err(ParseError::ScanningError)?);
         Ok(())
     }
 
@@ -64,7 +65,11 @@ impl<'input> ParserState<'input> {
 
     /// consume one token from the lexer,
     /// return an error if it doesn't match `kind`
-    pub fn consume(&mut self, _kind: TokenKind, err_msg: &'static str) -> Result<(), ParseError> {
+    pub fn consume(
+        &mut self,
+        _kind: TokenKind,
+        err_msg: &'static str,
+    ) -> Result<(), ParseError> {
         self.advance()?;
         if !matches!(&self.previous()?.kind, _kind) {
             return Err(ParseError::ExpectedToken(err_msg));
@@ -75,7 +80,8 @@ impl<'input> ParserState<'input> {
     /// returns `true` if the current token if of type `kind`
     /// only check the variant type, not embeded values( if any)
     pub fn check(&self, kind: TokenKind) -> Result<bool, ParseError> {
-        Ok(std::mem::discriminant(&kind) == std::mem::discriminant(&self.current()?.kind))
+        Ok(std::mem::discriminant(&kind)
+            == std::mem::discriminant(&self.current()?.kind))
     }
 
     /// returns `true` if the current token if of type `kind`,

@@ -1,6 +1,6 @@
 use crate::{
-    arrays::Array, boxed_values::BoxedValue, compactor::LivenessFlag, lists::List, strings::Str,
-    tombstones::Tombstone, values::Value,
+    arrays::Array, boxed_values::BoxedValue, compactor::LivenessFlag,
+    lists::List, strings::Str, tombstones::Tombstone, values::Value,
 };
 use std::ptr::NonNull;
 
@@ -88,5 +88,9 @@ pub trait Markable {
 
     /// Replace a given reference by a new one.
     /// (Usefull when "evacutation" occurs)
-    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header);
+    fn replace_reference(
+        &mut self,
+        old_ref: *const Header,
+        new_ref: *const Header,
+    );
 }

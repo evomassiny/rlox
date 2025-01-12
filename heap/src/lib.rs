@@ -22,8 +22,8 @@ pub use crate::values::Value;
 #[test]
 fn test_alloc_boxed_values() {
     let mut heap = Heap::new();
-    let number: &mut BoxedValue =
-        BoxedValue::new(&mut heap, Value::Int(1)).expect("BoxedValue allocation failed");
+    let number: &mut BoxedValue = BoxedValue::new(&mut heap, Value::Int(1))
+        .expect("BoxedValue allocation failed");
     *number.as_mut() = Value::Int(4);
     let value: Value = *number.as_ref();
     assert_eq!(value, Value::Int(4));
@@ -32,7 +32,8 @@ fn test_alloc_boxed_values() {
 #[test]
 fn test_alloc_str() {
     let mut heap = Heap::new();
-    let string: &mut Str = Str::new(&mut heap, "covefefe").expect("Str allocation failed");
+    let string: &mut Str =
+        Str::new(&mut heap, "covefefe").expect("Str allocation failed");
     assert_eq!(string.as_ref(), "covefefe");
 }
 
@@ -40,7 +41,8 @@ fn test_alloc_str() {
 fn test_alloc_array() {
     use crate::arrays::Array;
     let mut heap = Heap::new();
-    let array: &mut Array<usize> = Array::new(&mut heap, 10).expect("array allocation failed");
+    let array: &mut Array<usize> =
+        Array::new(&mut heap, 10).expect("array allocation failed");
     unsafe {
         *array.get_mut(0) = 45;
         assert_eq!(*array.get(0), 45);
@@ -104,10 +106,13 @@ fn test_out_of_bound_access_list() {
 fn test_marking() {
     use std::ptr::addr_of;
     let mut heap = Heap::new();
-    let str_a: &mut Str = Str::new(&mut heap, "aaaa").expect("Str allocation failed");
-    let str_b: &mut Str = Str::new(&mut heap, "dddd").expect("Str allocation failed");
+    let str_a: &mut Str =
+        Str::new(&mut heap, "aaaa").expect("Str allocation failed");
+    let str_b: &mut Str =
+        Str::new(&mut heap, "dddd").expect("Str allocation failed");
     let _ = str_b;
-    let _str_c: &mut Str = Str::new(&mut heap, "cccc").expect("Str allocation failed");
+    let _str_c: &mut Str =
+        Str::new(&mut heap, "cccc").expect("Str allocation failed");
 
     let list: &mut List = List::new(&mut heap).expect("list allocation failed");
     let _ = list.push(&mut heap, Value::Str(str_a as *const Str));

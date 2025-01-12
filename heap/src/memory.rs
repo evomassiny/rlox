@@ -29,7 +29,10 @@ impl Memory {
         Self { blocks: Vec::new() }
     }
 
-    pub(crate) fn alloc(&mut self, alloc_size: usize) -> Result<InBlockPtr, MemoryError> {
+    pub(crate) fn alloc(
+        &mut self,
+        alloc_size: usize,
+    ) -> Result<InBlockPtr, MemoryError> {
         // align size on 8 bytes, as x86_64 proc don't
         // allow misaligned memory access.
         let alloc_size = round_up_to_8_bytes_aligned(alloc_size);
@@ -56,8 +59,11 @@ impl Memory {
 
     /// Build a mapping between blocks (grouped by "hole count")
     /// and the number of free line in the group.
-    pub fn compute_availabily_histogram(&mut self) -> [usize; MAX_NB_OF_HOLE_IN_BLOCK] {
-        let mut hist: [usize; MAX_NB_OF_HOLE_IN_BLOCK] = [0; MAX_NB_OF_HOLE_IN_BLOCK];
+    pub fn compute_availabily_histogram(
+        &mut self,
+    ) -> [usize; MAX_NB_OF_HOLE_IN_BLOCK] {
+        let mut hist: [usize; MAX_NB_OF_HOLE_IN_BLOCK] =
+            [0; MAX_NB_OF_HOLE_IN_BLOCK];
         for block in self.blocks.iter() {
             match block.header().state {
                 BlockState::PartiallyFull {
@@ -73,11 +79,15 @@ impl Memory {
     /// re-allocate an object into an Existing block,
     /// prefering "PartiallyFull" blocks
     /// and avoiding "Evacuating" one.
-    pub(crate) fn evacuate(&mut self, alloc_size: usize) -> Result<InBlockPtr, MemoryError> {
+    pub(crate) fn evacuate(
+        &mut self,
+        alloc_size: usize,
+    ) -> Result<InBlockPtr, MemoryError> {
         // linearly search for an empty slot big enough for `alloc_size`
         // preferably in "PartiallyFull" blocks
         for block in self.blocks.iter_mut() {
-            if !matches!(block.header().state, BlockState::PartiallyFull { .. }) {
+            if !matches!(block.header().state, BlockState::PartiallyFull { .. })
+            {
                 continue;
             }
             if let Some(address) = block.claim_slot(alloc_size) {

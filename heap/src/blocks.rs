@@ -56,7 +56,8 @@ impl Block {
         // * the size check is of `size` is already done.
         // * We check for null right before calling `NonNull::new_unchecked()`
         unsafe {
-            let layout = Layout::from_size_align_unchecked(BLOCK_SIZE, BLOCK_SIZE);
+            let layout =
+                Layout::from_size_align_unchecked(BLOCK_SIZE, BLOCK_SIZE);
             let ptr = alloc(layout);
             if ptr.is_null() {
                 return Err(BlockError::OOM);
@@ -70,14 +71,18 @@ impl Block {
         // SAFETY:
         // * the size check is of `size` is done at the allocation
         unsafe {
-            let layout = Layout::from_size_align_unchecked(BLOCK_SIZE, BLOCK_SIZE);
+            let layout =
+                Layout::from_size_align_unchecked(BLOCK_SIZE, BLOCK_SIZE);
             dealloc(self.ptr.as_ptr(), layout);
         }
     }
 
     /// returns a pointer to a slice of bytes
     /// that can contains an object of `alloc_size`.
-    pub(crate) fn claim_slot(&mut self, alloc_size: usize) -> Option<InBlockPtr> {
+    pub(crate) fn claim_slot(
+        &mut self,
+        alloc_size: usize,
+    ) -> Option<InBlockPtr> {
         let mut next_bump = self.cursor + alloc_size;
         // check is the object would fit in the empty slice pointed by self.cursor
         // if not, lookup for the next hole
@@ -138,7 +143,8 @@ impl Block {
 
     /// find the first hole in the block
     pub(crate) fn update_hole_cursor(&mut self) {
-        let offset_to_data = BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE);
+        let offset_to_data =
+            BlockOffset::from_line_index(BLOCK_HEADER_SIZE_IN_LINE);
         match self.header().find_next_available_hole(offset_to_data) {
             Some((cursor, limit)) => {
                 self.cursor = cursor;

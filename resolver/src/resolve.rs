@@ -43,7 +43,12 @@ fn resolve_class_stmt<'table>(
     let super_name_id = match super_name {
         Some(super_name) => match chain.resolve(&super_name) {
             Some(super_name) => Some(super_name),
-            None => return Err(NameError::UnboundedVariable(super_name, src.clone())),
+            None => {
+                return Err(NameError::UnboundedVariable(
+                    super_name,
+                    src.clone(),
+                ))
+            }
         },
         None => None,
     };
@@ -56,7 +61,9 @@ fn resolve_class_stmt<'table>(
     } in methods
     {
         // validate that we're dealing with method
-        let StmtKind::Function(method_name, method_args, method_body) = method_stmt_kind else {
+        let StmtKind::Function(method_name, method_args, method_body) =
+            method_stmt_kind
+        else {
             panic!(
                 "Parsing error in {class_name}, l. {0}, class definition should only contain methods.",
                 src.line,
@@ -64,8 +71,13 @@ fn resolve_class_stmt<'table>(
         };
         // namespace function name, to avoid collision with standard functions
         let internal_method_name = format!("{class_name}::{method_name}");
-        let method_stmt_kind =
-            resolve_fun_stmt(internal_method_name, method_args, method_body, &span, chain)?;
+        let method_stmt_kind = resolve_fun_stmt(
+            internal_method_name,
+            method_args,
+            method_body,
+            &span,
+            chain,
+        )?;
         out_methods.push(Stmt {
             kind: method_stmt_kind,
             span: span,
@@ -120,13 +132,15 @@ fn resolve_if_stmt<'table>(
     // we need to introduce a new scope, otherwise a variable defined in the
     // "then" branch could be used in the "else" one.
     chain.push_scope(ScopeKind::Block);
-    let then_branch: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*then_branch, chain)?);
+    let then_branch: Box<Stmt<Sym>> =
+        Box::new(resolve_names_in_stmt(*then_branch, chain)?);
     chain.pop_scope();
     // validate "else" branch
     let maybe_else_branch: Option<Box<Stmt<Sym>>> = match maybe_else_branch {
         Some(else_branch) => {
             chain.push_scope(ScopeKind::Block);
-            let else_branch = Box::new(resolve_names_in_stmt(*else_branch, chain)?);
+            let else_branch =
+                Box::new(resolve_names_in_stmt(*else_branch, chain)?);
             chain.pop_scope();
             Some(else_branch)
         }
@@ -195,7 +209,9 @@ fn resolve_var_stmt<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<Sym>, NameError> {
     // check that the variable was not already defined in the same scope
-    if let Some(previous_decl) = chain.location_of_declaration_in_current_scope(&name) {
+    if let Some(previous_decl) =
+        chain.location_of_declaration_in_current_scope(&name)
+    {
         return Err(NameError::RedefinitionError(
             name,
             src.clone(),
@@ -203,7 +219,8 @@ fn resolve_var_stmt<'table>(
         ));
     }
     // validate intializer expression
-    let initializer_expr: Box<Expr<Sym>> = resolve_expression(intializer, src, chain)?;
+    let initializer_expr: Box<Expr<Sym>> =
+        resolve_expression(intializer, src, chain)?;
 
     // register binding
     let name: Sym = chain.add(name, src.clone());
@@ -278,14 +295,23 @@ fn resolve_expression<'table>(
             let callee = resolve_expression(callee_expr, src, chain)?;
             let mut out_args = Vec::with_capacity(args.len());
             for in_arg in args {
-                out_args.push(*resolve_expression(Box::new(in_arg), src, chain)?);
+                out_args.push(*resolve_expression(
+                    Box::new(in_arg),
+                    src,
+                    chain,
+                )?);
             }
             ExprKind::Call(callee, out_args)
         }
         Assign(bind_name, r_value_expr) => {
             let symbol_id = match chain.resolve(&bind_name) {
                 Some(symbol_id) => symbol_id,
-                None => return Err(NameError::UnboundedVariable(bind_name, src.clone())),
+                None => {
+                    return Err(NameError::UnboundedVariable(
+                        bind_name,
+                        src.clone(),
+                    ))
+                }
             };
             let r_value_expr = resolve_expression(r_value_expr, src, chain)?;
             ExprKind::Assign(symbol_id, r_value_expr)
@@ -293,7 +319,12 @@ fn resolve_expression<'table>(
         Variable(bind_name) => {
             let symbol_id = match chain.resolve(&bind_name) {
                 Some(symbol_id) => symbol_id,
-                None => return Err(NameError::UnboundedVariable(bind_name, src.clone())),
+                None => {
+                    return Err(NameError::UnboundedVariable(
+                        bind_name,
+                        src.clone(),
+                    ))
+                }
             };
             ExprKind::Variable(symbol_id)
         }
@@ -328,26 +359,40 @@ fn resolve_names_in_stmt<'table>(
     use StmtKind::*;
     let out_kind: StmtKind<Sym> = match in_stmt.kind {
         Block(stmts) => resolve_block_stmt(stmts, chain)?,
-        Class(name, maybe_super_name, methods) => {
-            resolve_class_stmt(name, maybe_super_name, methods, &in_stmt.span, chain)?
-        }
-        If(condition, then, maybe_else) => {
-            resolve_if_stmt(condition, then, maybe_else, &in_stmt.span, chain)?
-        }
-        Function(name, args, body) => resolve_fun_stmt(name, args, body, &in_stmt.span, chain)?,
-        Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
-        Print(expr) => resolve_print_stmt(expr, &in_stmt.span, chain)?,
-        Return(maybe_expr) => resolve_return_stmt(maybe_expr, &in_stmt.span, chain)?,
-        Var(name, intializer) => resolve_var_stmt(name, intializer, &in_stmt.span, chain)?,
-        While(condition, body) => resolve_while_stmt(condition, body, &in_stmt.span, chain)?,
-        For(maybe_initializer, maybe_condition, maybe_increment, body) => resolve_for_stmt(
-            maybe_initializer,
-            maybe_condition,
-            maybe_increment,
-            body,
+        Class(name, maybe_super_name, methods) => resolve_class_stmt(
+            name,
+            maybe_super_name,
+            methods,
             &in_stmt.span,
             chain,
         )?,
+        If(condition, then, maybe_else) => {
+            resolve_if_stmt(condition, then, maybe_else, &in_stmt.span, chain)?
+        }
+        Function(name, args, body) => {
+            resolve_fun_stmt(name, args, body, &in_stmt.span, chain)?
+        }
+        Expr(expr) => resolve_expr_stmt(expr, &in_stmt.span, chain)?,
+        Print(expr) => resolve_print_stmt(expr, &in_stmt.span, chain)?,
+        Return(maybe_expr) => {
+            resolve_return_stmt(maybe_expr, &in_stmt.span, chain)?
+        }
+        Var(name, intializer) => {
+            resolve_var_stmt(name, intializer, &in_stmt.span, chain)?
+        }
+        While(condition, body) => {
+            resolve_while_stmt(condition, body, &in_stmt.span, chain)?
+        }
+        For(maybe_initializer, maybe_condition, maybe_increment, body) => {
+            resolve_for_stmt(
+                maybe_initializer,
+                maybe_condition,
+                maybe_increment,
+                body,
+                &in_stmt.span,
+                chain,
+            )?
+        }
     };
     Ok(Stmt {
         kind: out_kind,
@@ -357,7 +402,10 @@ fn resolve_names_in_stmt<'table>(
 }
 
 /// Resolve all globals from the top ast node
-fn resolve_globals(in_ast: &Vec<Stmt<String>>, symbols: &mut SymbolTable) -> Globals {
+fn resolve_globals(
+    in_ast: &Vec<Stmt<String>>,
+    symbols: &mut SymbolTable,
+) -> Globals {
     let mut globals = Globals::new();
     use StmtKind::*;
     for stmt in in_ast {

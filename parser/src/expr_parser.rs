@@ -1,6 +1,6 @@
 use super::ast::{
-    BinaryExprKind, Expr as GenericExpr, ExprKind as GenericExprKind, LiteralKind, LogicalExprKind,
-    UnaryExprKind,
+    BinaryExprKind, Expr as GenericExpr, ExprKind as GenericExprKind,
+    LiteralKind, LogicalExprKind, UnaryExprKind,
 };
 use super::parser_state::{ParseError, ParserState};
 use lexer::{Token, TokenKind};
@@ -49,7 +49,8 @@ type PrefixParserFn = fn(&mut ParserState, bool) -> Result<Expr, ParseError>;
 
 /// a function that parses an expression from a state and the previously parsed
 /// expression, given an infix TokenKind
-type InfixParserFn = fn(&mut ParserState, Expr, bool) -> Result<Expr, ParseError>;
+type InfixParserFn =
+    fn(&mut ParserState, Expr, bool) -> Result<Expr, ParseError>;
 
 impl<'state, 'input> ExprParser<'state, 'input>
 where
@@ -78,7 +79,9 @@ where
 
         // Combine parsed expression with the next right expression,
         // if the next token is defines an infix expression.
-        while let Some(next_expr_precedence) = Self::get_token_precedence(&state.current()?.kind) {
+        while let Some(next_expr_precedence) =
+            Self::get_token_precedence(&state.current()?.kind)
+        {
             if next_expr_precedence < precedence {
                 // NOTE: not clear whether we should use < or <=
                 break;
@@ -86,13 +89,18 @@ where
             state.advance()?;
             // call the rule associated with handling
             // expressing **CONTAINING** this token
-            let next_expr_parser_fn = Self::get_infix_handler(&state.previous()?.kind).ok_or(
-                ParseError::ExpectedExpression("Expected expression after infix operator."),
-            )?;
+            let next_expr_parser_fn = Self::get_infix_handler(
+                &state.previous()?.kind,
+            )
+            .ok_or(ParseError::ExpectedExpression(
+                "Expected expression after infix operator.",
+            ))?;
             expr = next_expr_parser_fn(state, expr, can_assign)?;
         }
         if can_assign && state.matches(TokenKind::Equal)? {
-            return Err(ParseError::ExpectedToken("Invalid assignement target."));
+            return Err(ParseError::ExpectedToken(
+                "Invalid assignement target.",
+            ));
         }
         Ok(expr)
     }
@@ -161,7 +169,10 @@ where
         }
     }
 
-    fn parse_grouping(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_grouping(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::LeftParen,
             span,
@@ -169,7 +180,8 @@ where
         else {
             return Err(ParseError::ExpectedToken("Expected '('."));
         };
-        let inner_expression = Self::parse_precedence(state, Precedence::Assignement)?;
+        let inner_expression =
+            Self::parse_precedence(state, Precedence::Assignement)?;
         state.advance()?;
         let Token {
             kind: TokenKind::RightParen,
@@ -187,7 +199,10 @@ where
     }
 
     /// Build an Unary expression representing a "Minus" expression.
-    fn parse_minus(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_minus(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Minus,
             span,
@@ -195,17 +210,24 @@ where
         else {
             return Err(ParseError::ExpectedToken("Expected '-'."));
         };
-        let child_expression = Self::parse_precedence(state, Precedence::Unary)?;
+        let child_expression =
+            Self::parse_precedence(state, Precedence::Unary)?;
 
         Ok(Expr {
             id: state.new_node_id(),
-            kind: ExprKind::Unary(UnaryExprKind::Minus, Box::new(child_expression)),
+            kind: ExprKind::Unary(
+                UnaryExprKind::Minus,
+                Box::new(child_expression),
+            ),
             span,
         })
     }
 
     /// Build an Unary expression representing a "Not" expression.
-    fn parse_not(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_not(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Bang,
             span,
@@ -213,17 +235,24 @@ where
         else {
             return Err(ParseError::ExpectedToken("Expected '!'."));
         };
-        let child_expression = Self::parse_precedence(state, Precedence::Unary)?;
+        let child_expression =
+            Self::parse_precedence(state, Precedence::Unary)?;
 
         Ok(Expr {
             id: state.new_node_id(),
-            kind: ExprKind::Unary(UnaryExprKind::Not, Box::new(child_expression)),
+            kind: ExprKind::Unary(
+                UnaryExprKind::Not,
+                Box::new(child_expression),
+            ),
             span,
         })
     }
 
     /// Build a Literal expression from a Number Token.
-    fn parse_number(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_number(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Number(value),
             span,
@@ -239,7 +268,10 @@ where
     }
 
     /// Build a Literal expression from a String Token.
-    fn parse_string(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_string(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Str(value),
             span,
@@ -255,7 +287,10 @@ where
     }
 
     /// Build a Literal expression from a Nil Token.
-    fn parse_nil(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_nil(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Nil,
             span,
@@ -271,7 +306,10 @@ where
     }
 
     /// Build a Literal expression from a `true` Token.
-    fn parse_true(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_true(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::True,
             span,
@@ -287,7 +325,10 @@ where
     }
 
     /// Build a Literal expression from a `false` Token.
-    fn parse_false(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_false(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::False,
             span,
@@ -303,7 +344,10 @@ where
     }
 
     /// Build a `Variable` expression from an `Identifier` Token.
-    fn parse_variable(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_variable(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Identifier(name),
             span,
@@ -319,7 +363,10 @@ where
     }
 
     /// Build a `Super` expression from an [`Super`, `Dot`, `Identifier`] Token sequences.
-    fn parse_super(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_super(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::Super,
             ..
@@ -341,7 +388,9 @@ where
             span,
         } = state.take_previous()?
         else {
-            return Err(ParseError::ExpectedToken("Expected a method identifier"));
+            return Err(ParseError::ExpectedToken(
+                "Expected a method identifier",
+            ));
         };
         Ok(Expr {
             id: state.new_node_id(),
@@ -351,7 +400,10 @@ where
     }
 
     /// Build a `This` expression from a `This` token.
-    fn parse_this(state: &mut ParserState, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_this(
+        state: &mut ParserState,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token {
             kind: TokenKind::This,
             span: this_span,
@@ -377,7 +429,8 @@ where
         let Token { span, .. } = state.take_previous()?;
         let mut arguments: Vec<Expr> = Vec::new();
         while !matches!(state.current()?.kind, TokenKind::RightParen) {
-            arguments.push(Self::parse_precedence(state, Precedence::Assignement)?);
+            arguments
+                .push(Self::parse_precedence(state, Precedence::Assignement)?);
             if matches!(state.current()?.kind, TokenKind::Comma) {
                 state.advance()?;
             }
@@ -417,19 +470,31 @@ where
         let rhs = Self::parse_precedence(state, Precedence::Equality)?;
         Ok(Expr {
             id: state.new_node_id(),
-            kind: ExprKind::Logical(Box::new(lhs), LogicalExprKind::And, Box::new(rhs)),
+            kind: ExprKind::Logical(
+                Box::new(lhs),
+                LogicalExprKind::And,
+                Box::new(rhs),
+            ),
             span,
         })
     }
 
     /// Build an 'or' logical expression,
     /// (assumes a 'or' token has just been parsed)
-    fn parse_or(state: &mut ParserState, lhs: Expr, _can_assign: bool) -> Result<Expr, ParseError> {
+    fn parse_or(
+        state: &mut ParserState,
+        lhs: Expr,
+        _can_assign: bool,
+    ) -> Result<Expr, ParseError> {
         let Token { span, .. } = state.take_previous()?;
         let rhs = Self::parse_precedence(state, Precedence::And)?;
         Ok(Expr {
             id: state.new_node_id(),
-            kind: ExprKind::Logical(Box::new(lhs), LogicalExprKind::Or, Box::new(rhs)),
+            kind: ExprKind::Logical(
+                Box::new(lhs),
+                LogicalExprKind::Or,
+                Box::new(rhs),
+            ),
             span,
         })
     }
@@ -441,7 +506,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::NotEqual)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::NotEqual,
+        )
     }
 
     /// Build an 'equal' comparison expression,
@@ -451,7 +521,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::Equal)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::Equal,
+        )
     }
 
     /// Build an 'less or equal' comparison expression,
@@ -461,7 +536,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::LessEqual)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::LessEqual,
+        )
     }
 
     /// Build an 'less' comparison expression,
@@ -471,7 +551,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::Less)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::Less,
+        )
     }
 
     /// Build an 'greater or equal' comparison expression,
@@ -481,7 +566,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::GreaterEqual)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::GreaterEqual,
+        )
     }
 
     /// Build an 'greater' expression,
@@ -491,7 +581,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Term, BinaryExprKind::Greater)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Term,
+            BinaryExprKind::Greater,
+        )
     }
 
     /// Build a sum,
@@ -501,7 +596,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Factor, BinaryExprKind::Add)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Factor,
+            BinaryExprKind::Add,
+        )
     }
 
     /// Build a substraction,
@@ -511,7 +611,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Factor, BinaryExprKind::Sub)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Factor,
+            BinaryExprKind::Sub,
+        )
     }
 
     /// Build a product,
@@ -521,7 +626,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Unary, BinaryExprKind::Mul)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Unary,
+            BinaryExprKind::Mul,
+        )
     }
 
     /// Build a division,
@@ -531,7 +641,12 @@ where
         lhs: Expr,
         _can_assign: bool,
     ) -> Result<Expr, ParseError> {
-        Self::parse_binary_expression(state, lhs, Precedence::Unary, BinaryExprKind::Div)
+        Self::parse_binary_expression(
+            state,
+            lhs,
+            Precedence::Unary,
+            BinaryExprKind::Div,
+        )
     }
 
     /// Build a Get or a Set Expr,
@@ -560,7 +675,8 @@ where
             let Token {
                 span: equal_span, ..
             } = state.take_previous()?;
-            let rvalue = Self::parse_precedence(state, Precedence::Assignement)?;
+            let rvalue =
+                Self::parse_precedence(state, Precedence::Assignement)?;
             return Ok(Expr {
                 kind: ExprKind::Set(Box::new(lhs), id, Box::new(rvalue)),
                 span: equal_span,
@@ -592,7 +708,9 @@ where
             ..
         } = lvalue
         else {
-            return Err(ParseError::ExpectedToken("Can only assign to variables"));
+            return Err(ParseError::ExpectedToken(
+                "Can only assign to variables",
+            ));
         };
 
         let rvalue = Self::parse_precedence(state, Precedence::Or)?;
@@ -607,7 +725,9 @@ where
 #[cfg(test)]
 mod parsing {
     use super::{Expr, ExprKind, ExprParser};
-    use crate::ast::{BinaryExprKind, LiteralKind, LogicalExprKind, UnaryExprKind};
+    use crate::ast::{
+        BinaryExprKind, LiteralKind, LogicalExprKind, UnaryExprKind,
+    };
     use crate::parser_state::{ParseError, ParserState};
     use lexer::{Lexer, StrPeeker};
 
@@ -692,7 +812,8 @@ mod parsing {
     fn parse_unary_minus() {
         let src = "-1";
         let expr = parse_expression(src).unwrap();
-        let ExprKind::Unary(UnaryExprKind::Minus, inner_expr) = expr.kind else {
+        let ExprKind::Unary(UnaryExprKind::Minus, inner_expr) = expr.kind
+        else {
             panic!("failed to parse minus")
         };
         assert_eq!(inner_expr.kind, ExprKind::Literal(LiteralKind::Num(1.)));

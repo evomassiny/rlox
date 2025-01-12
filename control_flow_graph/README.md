@@ -12,4 +12,4 @@ of later statical analysis passes, most notably: __type checking__.
 Later stages of the compiler should use this CFG representation of the source 
 (or another one derived from it).
 
-
+Ressources: the `Mir` struct from inko's compiler was of great help.

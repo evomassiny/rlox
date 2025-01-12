@@ -25,7 +25,9 @@ pub struct List {
 }
 
 impl List {
-    pub fn new<'a, 'b>(heap: &'a mut Heap) -> Result<&'b mut Self, MemoryError> {
+    pub fn new<'a, 'b>(
+        heap: &'a mut Heap,
+    ) -> Result<&'b mut Self, MemoryError> {
         let obj_size = std::mem::size_of::<Self>();
         let ptr = heap.alloc(obj_size)?;
         let array_mut_ref = Array::<Value>::new(heap, LIST_START_CAPACITY)?;
@@ -67,7 +69,11 @@ impl List {
     }
 
     /// append `value` to self.
-    pub fn push(&mut self, heap: &mut Heap, value: Value) -> Result<(), MemoryError> {
+    pub fn push(
+        &mut self,
+        heap: &mut Heap,
+        value: Value,
+    ) -> Result<(), MemoryError> {
         let length = self.length;
         if self.capacity == length {
             self.grow_inner_array(heap)?;
@@ -129,7 +135,8 @@ impl Markable for List {
         /// safe because both &self and self.array_ptr are non Null
         unsafe {
             let array_header_ptr = addr_of!((*self.array_ptr).header);
-            let self_ptr = Some(NonNull::new_unchecked(self as *const _ as *mut Header));
+            let self_ptr =
+                Some(NonNull::new_unchecked(self as *const _ as *mut Header));
             object_ptrs.push(ObjectRef {
                 origin: self_ptr,
                 dest: NonNull::new_unchecked(array_header_ptr.cast_mut()),
@@ -144,7 +151,11 @@ impl Markable for List {
         std::mem::size_of::<Self>()
     }
 
-    fn replace_reference(&mut self, old_ref: *const Header, new_ref: *const Header) {
+    fn replace_reference(
+        &mut self,
+        old_ref: *const Header,
+        new_ref: *const Header,
+    ) {
         // replace refs in boxed values
         for i in 0..self.length {
             self[i].replace_reference(old_ref, new_ref);

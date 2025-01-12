@@ -24,7 +24,10 @@ impl Heap {
         }
     }
 
-    pub(crate) fn alloc(&mut self, alloc_size: usize) -> Result<InBlockPtr, MemoryError> {
+    pub(crate) fn alloc(
+        &mut self,
+        alloc_size: usize,
+    ) -> Result<InBlockPtr, MemoryError> {
         self.memory.alloc(alloc_size)
     }
 
