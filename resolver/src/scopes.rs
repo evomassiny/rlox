@@ -1,81 +1,10 @@
-use super::symbols::{StorageKind, Sym, SymbolId, SymbolTable};
+use super::symbols::{StorageKind, SymbolId, SymbolTable};
 use lexer::Span;
 use std::collections::HashMap;
 
-/// Resolution of globals is trickier than it seems,
-/// consider the following:
-/// ```lox
-/// fun foo() { bar(); }
-/// fun bar() { print "first"; }
-/// foo();
-/// fun bar() { print "second"; }
-/// foo();
-/// ```
-/// the 2 invokations of `foo()` won't lead to the same
-/// `bar()` call.
-/// Said otherwise, the resolution of a global variable depends of
-/// the callsite.
-/// This is why we need to store them separetly.
-pub struct Globals {
-    /// redefinition is allowed in globals,
-    pub symbols: HashMap<String, Vec<SymbolId>>,
-}
-impl Globals {
-    pub fn new() -> Self {
-        Self {
-            symbols: HashMap::new(),
-        }
-    }
-
-    /// register a global (alongside its span)
-    pub fn add(
-        &mut self,
-        name: String,
-        src: Span,
-        table: &mut SymbolTable,
-    ) -> SymbolId {
-        let symbol_id = table.add(name.clone(), src);
-
-        self.symbols
-            .entry(name)
-            .or_insert_with(Vec::<SymbolId>::new)
-            .push(symbol_id);
-        symbol_id
-    }
-
-    /// lookup for the last global variable
-    /// named `name` defined before `src`.
-    pub fn resolve_precise(
-        &self,
-        name: &str,
-        src: &Span,
-        table: &SymbolTable,
-    ) -> Option<SymbolId> {
-        let mut last: Option<SymbolId> = None;
-        if let Some(globals) = self.symbols.get(name) {
-            for global_id in globals {
-                if table[global_id].src.line > src.line {
-                    return last;
-                }
-                last = Some(*global_id);
-            }
-        }
-        last
-    }
-
-    pub fn resolve(&self, name: &str, table: &SymbolTable) -> Option<Sym> {
-        if let Some(globals) = self.symbols.get(name) {
-            if globals.len() == 0 {
-                return Some(Sym::Direct(globals[0]));
-            }
-            return Some(Sym::OneOf(globals.clone().into_boxed_slice()));
-        }
-        None
-    }
-}
 
 /// When we traverse the AST, we end up
-/// encountering 3 kinds of scope,
+/// encountering 4 kinds of scope,
 /// keeping track of them allow us to
 /// distinguish captured variable from the others,
 /// and resolve the type of `super` and `this`
@@ -84,6 +13,7 @@ pub enum ScopeKind {
     Block,
     FunDecl,
     ClassDecl,
+    Global,
 }
 
 pub struct Scope {
@@ -128,16 +58,13 @@ impl Scope {
 pub struct ScopeChain<'table> {
     // keeps track of all declared symbols
     symbols: &'table mut SymbolTable,
-    // holds all globals
-    globals: Globals,
     // a stack which should mimick the nesting of scopes
     // we are traversing.
     chain: Vec<Scope>,
 }
 impl<'table> ScopeChain<'table> {
-    pub fn new(globals: Globals, symbols: &'table mut SymbolTable) -> Self {
+    pub fn new(symbols: &'table mut SymbolTable) -> Self {
         Self {
-            globals,
             symbols,
             chain: Vec::new(),
         }
@@ -151,22 +78,15 @@ impl<'table> ScopeChain<'table> {
         let _ = self.chain.pop();
     }
 
-    pub fn add(&mut self, name: String, src: Span) -> Sym {
+    pub fn add(&mut self, name: String, src: Span) -> SymbolId {
         let symbol_id = match self.chain.last_mut() {
             // inner scope
             Some(scope) => scope.add(name, src, self.symbols),
             // We could append the binding directly into the global scope,
             // _but_ it should have been previously resolved, in a dedicated pass
-            None => {
-                match self.globals.resolve_precise(&name, &src, self.symbols) {
-                    Some(symbol_id) => symbol_id,
-                    None => {
-                        unreachable!("the global binding '{name}' should have already been resolved")
-                    }
-                }
-            }
+            None => unreachable!("the binding '{name}' should have already been resolved")
         };
-        Sym::Direct(symbol_id)
+        symbol_id
     }
 
     /// If `name` was already declared in the local scope,
@@ -187,7 +107,7 @@ impl<'table> ScopeChain<'table> {
 
     /// traverse the scope chain to find the nearest declaration of `name`
     /// In the process, promote variable as upvalues if needed.
-    pub fn resolve(&mut self, name: &str) -> Option<Sym> {
+    pub fn resolve(&mut self, name: &str) -> Option<SymbolId> {
         // first lookup in the lexical scope chain
         for scope_idx in (0..self.chain.len()).rev() {
             if let Some(symbol_id) = self.chain[scope_idx].resolve(name) {
@@ -203,10 +123,9 @@ impl<'table> ScopeChain<'table> {
                         }
                     }
                 }
-                return Some(Sym::Direct(symbol_id));
+                return Some(symbol_id);
             }
         }
-        // fallback to globals
-        self.globals.resolve(name, self.symbols)
+        None
     }
 }

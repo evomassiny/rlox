@@ -3,7 +3,7 @@ use parser::{
     BinaryExprKind, Expr, ExprKind, LiteralKind, NodeId, Stmt, StmtKind,
     UnaryExprKind,
 };
-use resolver::{Ast, Sym};
+use resolver::{Ast, SymbolId};
 
 #[derive(Debug)]
 pub enum TypeError {}
@@ -68,9 +68,9 @@ impl ConstraintStore {
 
 fn collect_binary_expression_constraints(
     binary_id: NodeId,
-    left: &Expr<Sym>,
+    left: &Expr<SymbolId>,
     kind: &BinaryExprKind,
-    right: &Expr<Sym>,
+    right: &Expr<SymbolId>,
     store: &mut ConstraintStore,
 ) -> Result<(), TypeError> {
     use BinaryExprKind::*;
@@ -100,7 +100,7 @@ fn collect_binary_expression_constraints(
 }
 
 fn collect_expression_constraints<'set>(
-    expr: &Expr<Sym>,
+    expr: &Expr<SymbolId>,
     store: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
     // TODO:
@@ -109,7 +109,8 @@ fn collect_expression_constraints<'set>(
     use Constraint::*;
     use ExprKind::*;
     match &expr.kind {
-        // for str, number and bools, that's the easy case, we diretly know the type of the expression
+        // for str, number and bools,
+        // we directly know the type of the expression
         // for Nil, we can't decide anything.
         Literal(literal_kind) => {
             match &literal_kind {
@@ -145,7 +146,7 @@ fn collect_expression_constraints<'set>(
             store.add(IsEither(expr.id, left.id, right.id));
         }
         Grouping(inner_expr) => {
-            // the inner node as the exact same type as its child
+            // the inner node has the exact same type as its child
             store.add(Same(expr.id, inner_expr.id));
         }
         Call(callee_expr, args) => {
@@ -158,6 +159,8 @@ fn collect_expression_constraints<'set>(
             store.add(ReturnTypeOf(callee_expr.id));
         },
         Assign(bind_name, r_value_expr) => {
+            // What should we do here ?
+            // if `bind_name` is a global, it could be redifined
 
         },
         Variable(bind_name) => todo!(),
@@ -170,7 +173,7 @@ fn collect_expression_constraints<'set>(
 }
 
 fn collect_constraints_in_stmt<'set>(
-    stmt: &Stmt<Sym>,
+    stmt: &Stmt<SymbolId>,
     set: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
     use StmtKind::*;

@@ -5,8 +5,8 @@ mod scopes;
 mod symbols;
 
 pub use resolve::{resolve_names, Ast, NameError};
-use scopes::{Globals, ScopeChain};
-pub use symbols::{StorageKind, Sym, Symbol, SymbolId, SymbolTable};
+use scopes::{ScopeChain};
+pub use symbols::{StorageKind, Symbol, SymbolId, SymbolTable};
 
 #[cfg(test)]
 mod resolver {

@@ -20,5 +20,5 @@ This process is done in two steps:
   In the code, the stack of variable definitions is represented by the type `ScopeChain`.
 
 The first step is necessary because the implementation of a function can refer to a global
-defined later in the script. As long as the global definition is executed prior to the function call, 
-this is valid.
+defined later in the script.
+As long as the global definition is executed prior to the function call, this is valid.

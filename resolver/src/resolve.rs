@@ -1,5 +1,5 @@
-use super::scopes::{Globals, ScopeChain, ScopeKind};
-use super::symbols::{Sym, Symbol, SymbolId, SymbolTable};
+use super::scopes::{ScopeChain, ScopeKind};
+use super::symbols::{Symbol, SymbolId, SymbolTable};
 use lexer::Span;
 use parser::{Expr, ExprKind, NodeId, Stmt, StmtKind};
 
@@ -12,16 +12,16 @@ pub enum NameError {
 
 #[derive(Debug)]
 pub struct Ast {
-    pub roots: Vec<Stmt<Sym>>,
+    pub roots: Vec<Stmt<SymbolId>>,
     pub symbols: SymbolTable,
 }
 
 fn resolve_block_stmt<'table>(
     stmts: Vec<Stmt<String>>,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     chain.push_scope(ScopeKind::Block);
-    let mut block_stmts: Vec<Stmt<Sym>> = Vec::new();
+    let mut block_stmts: Vec<Stmt<SymbolId>> = Vec::new();
     for in_body_stmt in stmts {
         block_stmts.push(resolve_names_in_stmt(in_body_stmt, chain)?);
     }
@@ -36,8 +36,8 @@ fn resolve_class_stmt<'table>(
     methods: Vec<Stmt<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
-    let class_name_id: Sym = chain.add(class_name.clone(), src.clone());
+) -> Result<StmtKind<SymbolId>, NameError> {
+    let class_name_id: SymbolId = chain.add(class_name.clone(), src.clone());
     chain.push_scope(ScopeKind::ClassDecl);
 
     let super_name_id = match super_name {
@@ -53,7 +53,7 @@ fn resolve_class_stmt<'table>(
         None => None,
     };
 
-    let mut out_methods: Vec<Stmt<Sym>> = Vec::new();
+    let mut out_methods: Vec<Stmt<SymbolId>> = Vec::new();
     for Stmt {
         kind: method_stmt_kind,
         span,
@@ -95,9 +95,9 @@ fn resolve_fun_stmt<'table>(
     body: Vec<Stmt<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     // add function name binding to parent scope
-    let name: Sym = chain.add(name, src.clone());
+    let name: SymbolId = chain.add(name, src.clone());
 
     chain.push_scope(ScopeKind::FunDecl);
 
@@ -125,18 +125,18 @@ fn resolve_if_stmt<'table>(
     maybe_else_branch: Option<Box<Stmt<String>>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     // validate the condition expression
-    let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
+    let condition: Box<Expr<SymbolId>> = resolve_expression(condition, src, chain)?;
     // validate the "then" branch,
     // we need to introduce a new scope, otherwise a variable defined in the
     // "then" branch could be used in the "else" one.
     chain.push_scope(ScopeKind::Block);
-    let then_branch: Box<Stmt<Sym>> =
+    let then_branch: Box<Stmt<SymbolId>> =
         Box::new(resolve_names_in_stmt(*then_branch, chain)?);
     chain.pop_scope();
     // validate "else" branch
-    let maybe_else_branch: Option<Box<Stmt<Sym>>> = match maybe_else_branch {
+    let maybe_else_branch: Option<Box<Stmt<SymbolId>>> = match maybe_else_branch {
         Some(else_branch) => {
             chain.push_scope(ScopeKind::Block);
             let else_branch =
@@ -155,12 +155,12 @@ fn resolve_while_stmt<'table>(
     body: Box<Stmt<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     // validate the condition expression
-    let condition: Box<Expr<Sym>> = resolve_expression(condition, src, chain)?;
+    let condition: Box<Expr<SymbolId>> = resolve_expression(condition, src, chain)?;
     // validate body statement
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*body, chain)?);
+    let body: Box<Stmt<SymbolId>> = Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::While(condition, body))
 }
@@ -173,24 +173,24 @@ fn resolve_for_stmt<'table>(
     body: Box<Stmt<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     // validate "for(initializer, condition, increment)"
-    let maybe_initializer: Option<Box<Expr<Sym>>> = match maybe_initializer {
+    let maybe_initializer: Option<Box<Expr<SymbolId>>> = match maybe_initializer {
         Some(initializer) => Some(resolve_expression(initializer, src, chain)?),
         None => None,
     };
-    let maybe_condition: Option<Box<Expr<Sym>>> = match maybe_condition {
+    let maybe_condition: Option<Box<Expr<SymbolId>>> = match maybe_condition {
         Some(condition) => Some(resolve_expression(condition, src, chain)?),
         None => None,
     };
-    let maybe_increment: Option<Box<Expr<Sym>>> = match maybe_increment {
+    let maybe_increment: Option<Box<Expr<SymbolId>>> = match maybe_increment {
         Some(increment) => Some(resolve_expression(increment, src, chain)?),
         None => None,
     };
 
     // validate for body
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<Sym>> = Box::new(resolve_names_in_stmt(*body, chain)?);
+    let body: Box<Stmt<SymbolId>> = Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::For(
         maybe_initializer,
@@ -207,7 +207,7 @@ fn resolve_var_stmt<'table>(
     intializer: Box<Expr<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
+) -> Result<StmtKind<SymbolId>, NameError> {
     // check that the variable was not already defined in the same scope
     if let Some(previous_decl) =
         chain.location_of_declaration_in_current_scope(&name)
@@ -219,11 +219,11 @@ fn resolve_var_stmt<'table>(
         ));
     }
     // validate intializer expression
-    let initializer_expr: Box<Expr<Sym>> =
+    let initializer_expr: Box<Expr<SymbolId>> =
         resolve_expression(intializer, src, chain)?;
 
     // register binding
-    let name: Sym = chain.add(name, src.clone());
+    let name: SymbolId = chain.add(name, src.clone());
 
     Ok(StmtKind::Var(name, initializer_expr))
 }
@@ -233,8 +233,8 @@ fn resolve_print_stmt<'table>(
     in_expr: Box<Expr<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
-    let out_expr: Box<Expr<Sym>> = resolve_expression(in_expr, src, chain)?;
+) -> Result<StmtKind<SymbolId>, NameError> {
+    let out_expr: Box<Expr<SymbolId>> = resolve_expression(in_expr, src, chain)?;
     Ok(StmtKind::Print(out_expr))
 }
 
@@ -243,8 +243,8 @@ fn resolve_return_stmt<'table>(
     maybe_expr: Option<Box<Expr<String>>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
-    let maybe_expression: Option<Box<Expr<Sym>>> = match maybe_expr {
+) -> Result<StmtKind<SymbolId>, NameError> {
+    let maybe_expression: Option<Box<Expr<SymbolId>>> = match maybe_expr {
         Some(expr) => Some(resolve_expression(expr, src, chain)?),
         None => None,
     };
@@ -257,8 +257,8 @@ fn resolve_expr_stmt<'table>(
     in_expr: Box<Expr<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<StmtKind<Sym>, NameError> {
-    let out_expr: Box<Expr<Sym>> = resolve_expression(in_expr, src, chain)?;
+) -> Result<StmtKind<SymbolId>, NameError> {
+    let out_expr: Box<Expr<SymbolId>> = resolve_expression(in_expr, src, chain)?;
     Ok(StmtKind::Expr(out_expr))
 }
 
@@ -267,11 +267,11 @@ fn resolve_expression<'table>(
     in_expr: Box<Expr<String>>,
     src: &Span,
     chain: &mut ScopeChain<'table>,
-) -> Result<Box<Expr<Sym>>, NameError> {
+) -> Result<Box<Expr<SymbolId>>, NameError> {
     use ExprKind::*;
     // TODO:
     // use an explicit stack for recursion instead of the stackframe
-    let out_kind: ExprKind<Sym> = match in_expr.kind {
+    let out_kind: ExprKind<SymbolId> = match in_expr.kind {
         Literal(literal_kind) => Literal(literal_kind),
         Unary(kind, inner_expr) => {
             let inner_out_expr = resolve_expression(inner_expr, src, chain)?;
@@ -355,9 +355,9 @@ fn resolve_expression<'table>(
 fn resolve_names_in_stmt<'table>(
     in_stmt: Stmt<String>,
     chain: &mut ScopeChain<'table>,
-) -> Result<Stmt<Sym>, NameError> {
+) -> Result<Stmt<SymbolId>, NameError> {
     use StmtKind::*;
-    let out_kind: StmtKind<Sym> = match in_stmt.kind {
+    let out_kind: StmtKind<SymbolId> = match in_stmt.kind {
         Block(stmts) => resolve_block_stmt(stmts, chain)?,
         Class(name, maybe_super_name, methods) => resolve_class_stmt(
             name,
@@ -402,27 +402,26 @@ fn resolve_names_in_stmt<'table>(
 }
 
 /// Resolve all globals from the top ast node
-fn resolve_globals(
+fn resolve_globals<'table>(
     in_ast: &Vec<Stmt<String>>,
-    symbols: &mut SymbolTable,
-) -> Globals {
-    let mut globals = Globals::new();
+    chain: &mut ScopeChain<'table>,
+) {
     use StmtKind::*;
+    chain.push_scope(ScopeKind::Global);
     for stmt in in_ast {
         match stmt.kind {
             Class(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), symbols);
+                chain.add(name.clone(), stmt.span.clone());
             }
             Function(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), symbols);
+                chain.add(name.clone(), stmt.span.clone());
             }
             Var(ref name, ..) => {
-                globals.add(name.clone(), stmt.span.clone(), symbols);
+                chain.add(name.clone(), stmt.span.clone());
             }
             _ => continue,
         }
     }
-    globals
 }
 
 /// traverse the input Abstract Syntax Tree,
@@ -434,17 +433,17 @@ pub fn resolve_names(in_ast: Vec<Stmt<String>>) -> Result<Ast, NameError> {
     // Traverse the AST in 2 passes:
     // * do a quick shallow pass, to locate globals
     // * do a real traversal, resolving everything
-
     let mut symbols = SymbolTable::new();
+    let mut chain = ScopeChain::new(&mut symbols);
 
     // 1. resolve globals
-    let globals = resolve_globals(&in_ast, &mut symbols);
+    resolve_globals(&in_ast, &mut chain);
 
     // 2. perform a pre-order tree traversal,
     // and maintains some kind of lexical scope chain,
     // during the traversal, we update `symbols`
-    let mut chain = ScopeChain::new(globals, &mut symbols);
-    let mut out_stmts: Vec<Stmt<Sym>> = Vec::new();
+    chain.push_scope(ScopeKind::Block);
+    let mut out_stmts: Vec<Stmt<SymbolId>> = Vec::new();
     for stmt in in_ast {
         let stmt = resolve_names_in_stmt(stmt, &mut chain)?;
         out_stmts.push(stmt);

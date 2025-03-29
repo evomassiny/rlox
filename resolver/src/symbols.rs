@@ -37,17 +37,6 @@ impl Symbol {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SymbolId(usize);
 
-/// either a direct
-/// reference to a given location, or an alternation between
-/// several variants.
-#[derive(Debug)]
-pub enum Sym {
-    // ref a know location in memory
-    Direct(SymbolId),
-    // Globals ! depend of callsite
-    OneOf(Box<[SymbolId]>),
-}
-
 /// A table of Symbols,
 /// indexable by a `SymbolId`
 #[derive(Debug)]
