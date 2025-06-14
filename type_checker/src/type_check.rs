@@ -6,27 +6,20 @@ use parser::{
 use resolver::{Ast, SymbolId};
 
 #[derive(Debug)]
-pub enum TypeError {}
+pub enum TypeError {
+    NoSuperClass,
+    NotInClass,
+}
 
 #[derive(Debug)]
 pub struct TypedAst {}
-
-pub enum MathOp {
-    // float |  string
-    Add,
-    // float
-    Sub,
-    // float
-    Mul,
-    // float
-    Div,
-}
 
 /// Constraints are properties of
 /// expression nodes that must be kept when
 /// picking the correct type for an expression.
 ///
 /// They are tied to AST nodes, identified by their `NodeId`.
+#[derive(Debug)]
 pub enum Constraint {
     IsNumOrStr(NodeId),
     IsNum(NodeId),
@@ -43,17 +36,25 @@ pub enum Constraint {
     // `a` can have both type depending of the runtime value
     IsEither(NodeId, NodeId, NodeId),
     ReturnTypeOf(NodeId),
-    //IsClass(SymbolId),
-    //HasAttr(String),
+    // `a = 1` means `a` has the same type as `1`
+    SymbolCanHoldTypeOf(SymbolId, NodeId),
+    HasTypeOfSymbol(NodeId, SymbolId),
+    IsClass(NodeId, SymbolId),
+    ClassHasAttr(SymbolId, String),
+    HasTypeOfAttr(NodeId, SymbolId, String),
 }
 
 struct ConstraintStore {
-    constraints: Vec<Constraint>,
+    pub(crate) constraints: Vec<Constraint>,
+    // those are traversal states
+    // current class, current super class
+    in_class_declaration: Option<(SymbolId, Option<SymbolId>)>,
 }
 impl ConstraintStore {
     pub fn new() -> Self {
         Self {
             constraints: Vec::new(),
+            in_class_declaration: None,
         }
     }
 
@@ -64,6 +65,35 @@ impl ConstraintStore {
     pub fn add(&mut self, constraint: Constraint) {
         self.constraints.push(constraint)
     }
+
+    /// Set the class id we are currently traversing
+    /// (I don't allow class definition nesting, Bob N. does)
+    pub fn set_current_class(&mut self, class: &SymbolId, super_class: &Option<SymbolId>) {
+        self.in_class_declaration = Some((*class, *super_class));
+    }
+    
+    /// Return the class ID we are currentlty traversing
+    pub fn get_current_class(&self) -> Option<SymbolId> {
+        match self.in_class_declaration {
+            Some((class_id, _)) => Some(class_id),
+            None => None,
+        }
+    }
+
+    /// Clear current class
+    pub fn clear_current_class(&mut self) {
+        self.in_class_declaration = None;
+    }
+
+    /// Return the ID of the parent class we are currently traversing
+    pub fn get_current_super_class(&self) -> Option<SymbolId> {
+        match self.in_class_declaration {
+            Some((_, Some(super_class_id))) => Some(super_class_id),
+            _ => None,
+        }
+    }
+
+
 }
 
 fn collect_binary_expression_constraints(
@@ -152,22 +182,40 @@ fn collect_expression_constraints<'set>(
         Call(callee_expr, args) => {
             // We known that "callee_expr" is a function.
             // which should be callable with those args
-            let arg_ids = args.iter().map(|arg| arg.id ).collect();
+            let arg_ids = args.iter().map(|arg| arg.id).collect();
             store.add(IsCallableWith(callee_expr.id, arg_ids));
             // we also know that the call expression
             // has the type of the return value of the expression.
             store.add(ReturnTypeOf(callee_expr.id));
-        },
+        }
         Assign(bind_name, r_value_expr) => {
-            // What should we do here ?
-            // if `bind_name` is a global, it could be redifined
-
-        },
-        Variable(bind_name) => todo!(),
-        Get(object_expr, attr_name) => todo!(),
+            // The assign expression itself is nil
+            store.add(IsNil(expr.id));
+            // the object can store the type of the `r_value_expr`
+            store.add(SymbolCanHoldTypeOf(*bind_name, r_value_expr.id));
+        }
+        Variable(bind_name) => {
+            // The bind expression itself is nil
+            store.add(IsNil(expr.id));
+            // variable has the type of the r_value
+            store.add(HasTypeOfSymbol(expr.id, *bind_name));
+        }
+        Get(object_expr, attr_name) => {
+            todo!()
+        }
         Set(object_expr, attr_name, r_value_expr) => todo!(),
-        Super(attr_name) => todo!(),
-        This => todo!(),
+        Super(attr_name) => {
+            let super_class = store.get_current_super_class()
+                .ok_or(TypeError::NoSuperClass)?;
+            store.add(IsClass(expr.id, super_class));
+            store.add(HasTypeOfAttr(expr.id, super_class, attr_name.clone()));
+        }
+        This => {
+            let this_class = store.get_current_class()
+                .ok_or(TypeError::NotInClass)?;
+            store.add(IsClass(expr.id, this_class));
+
+        }
     };
     Ok(())
 }
@@ -176,20 +224,38 @@ fn collect_constraints_in_stmt<'set>(
     stmt: &Stmt<SymbolId>,
     set: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
+    use Constraint::*;
     use StmtKind::*;
 
     match &stmt.kind {
-        Block(stmts) => todo!(),
-        Class(name, maybe_super_name, methods) => todo!(),
-        If(condition, then, maybe_else) => todo!(),
-        Function(name, args, body) => todo!(),
-        Expr(expr) => collect_expression_constraints(expr, set),
-        Print(expr) => todo!(),
-        Return(maybe_expr) => todo!(),
-        Var(name, intializer) => todo!(),
-        While(condition, body) => todo!(),
+        Block(stmts) => {
+            for stmt in stmts {
+                let _ = collect_constraints_in_stmt(stmt, set)?;
+            }
+        }
+        Class(name, maybe_super_name, methods) => {
+            set.set_current_class(name, maybe_super_name);
+            for method in methods {
+                let _ = collect_constraints_in_stmt(stmt, set)?;
+            }
+            set.clear_current_class();
+        }
+        If(condition, then, maybe_else) => todo!("If stmt"),
+        Function(name, args, body) => todo!("Function"),
+        Expr(expr) => {
+            let _ = collect_expression_constraints(expr, set)?;
+        }
+        Print(expr) => {
+            let _ = collect_expression_constraints(expr, set)?;
+        }
+        Return(maybe_expr) => todo!("Return"),
+        Var(name, intializer) => {
+            let _ = collect_expression_constraints(intializer, set)?;
+            set.add(SymbolCanHoldTypeOf(*name, intializer.id))
+        }
+        While(condition, body) => todo!("While loops"),
         For(maybe_initializer, maybe_condition, maybe_increment, body) => {
-            todo!()
+            todo!("For loops")
         }
     };
     Ok(())
@@ -213,6 +279,9 @@ pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     //   and this type implements `add`
     // * then we actually solve thoses constraints
     let constraints = collect_constraints(&untyped_ast)?;
+    for constraint in &constraints.constraints {
+        println!("{constraint:?}");
+    }
     let types = TypeTable::new();
     todo!()
 }

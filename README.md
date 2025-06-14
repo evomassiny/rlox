@@ -28,10 +28,13 @@ this is not a simple pass compiler, most passes are handled by a dedicated crate
 * the `lexer` tokenizes the input source ([doc](./lexer/README.md))
 * the `parser` parses the tokens into a basic Abstract Syntax Tree ([doc](./parser/README.md))
 * the `resolver` resolves names on the AST ([doc](./resolver/README.md))
-* the `resolver` resolves names on the AST ([doc](./resolver/README.md))
+* the `type_checker` performs type checking on the ~~symbols~~, ~~CFG~~, **AST** ([doc](./resolver/README.md))
 * the `control_flow_graph` turns the __AST__ into a __Control Flow Graph__ (CFG), it also turns variables
   into an __Static Single Assigment__ form (__SSA__) ([doc](./control_flow_graph/README.md))
-* the `type_checker` performs type checking on the ~~symbols~~, **CFG** ([doc](./resolver/README.md))
+
+The language implementation has some restrictions relative to the original one:
+* Classes must be defined in the top-most scope, conditional Type definition is not allowed,
+  (it makes type checking much much simplier)
 
 For the runtime/VM part, so far, it differs from the original implementation on the following points:
 * it uses a compacting garbage collector based on the "immix" implementation,

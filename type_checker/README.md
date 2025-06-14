@@ -6,7 +6,7 @@ Ressources:
 
 The type checker does 2 main passes:
 
-1. firts it collects all the type constraints in can see, 
+1. firts it collects all the type constraints it can see, 
 
 for instance, if `var a = 1 + b;` then we know that:
 * `a` as the same type as the expression `1 + b`

@@ -127,7 +127,8 @@ fn resolve_if_stmt<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<SymbolId>, NameError> {
     // validate the condition expression
-    let condition: Box<Expr<SymbolId>> = resolve_expression(condition, src, chain)?;
+    let condition: Box<Expr<SymbolId>> =
+        resolve_expression(condition, src, chain)?;
     // validate the "then" branch,
     // we need to introduce a new scope, otherwise a variable defined in the
     // "then" branch could be used in the "else" one.
@@ -136,7 +137,8 @@ fn resolve_if_stmt<'table>(
         Box::new(resolve_names_in_stmt(*then_branch, chain)?);
     chain.pop_scope();
     // validate "else" branch
-    let maybe_else_branch: Option<Box<Stmt<SymbolId>>> = match maybe_else_branch {
+    let maybe_else_branch: Option<Box<Stmt<SymbolId>>> = match maybe_else_branch
+    {
         Some(else_branch) => {
             chain.push_scope(ScopeKind::Block);
             let else_branch =
@@ -157,10 +159,12 @@ fn resolve_while_stmt<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<SymbolId>, NameError> {
     // validate the condition expression
-    let condition: Box<Expr<SymbolId>> = resolve_expression(condition, src, chain)?;
+    let condition: Box<Expr<SymbolId>> =
+        resolve_expression(condition, src, chain)?;
     // validate body statement
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<SymbolId>> = Box::new(resolve_names_in_stmt(*body, chain)?);
+    let body: Box<Stmt<SymbolId>> =
+        Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::While(condition, body))
 }
@@ -175,7 +179,8 @@ fn resolve_for_stmt<'table>(
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<SymbolId>, NameError> {
     // validate "for(initializer, condition, increment)"
-    let maybe_initializer: Option<Box<Expr<SymbolId>>> = match maybe_initializer {
+    let maybe_initializer: Option<Box<Expr<SymbolId>>> = match maybe_initializer
+    {
         Some(initializer) => Some(resolve_expression(initializer, src, chain)?),
         None => None,
     };
@@ -190,7 +195,8 @@ fn resolve_for_stmt<'table>(
 
     // validate for body
     chain.push_scope(ScopeKind::Block);
-    let body: Box<Stmt<SymbolId>> = Box::new(resolve_names_in_stmt(*body, chain)?);
+    let body: Box<Stmt<SymbolId>> =
+        Box::new(resolve_names_in_stmt(*body, chain)?);
     chain.pop_scope();
     Ok(StmtKind::For(
         maybe_initializer,
@@ -234,7 +240,8 @@ fn resolve_print_stmt<'table>(
     src: &Span,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<SymbolId>, NameError> {
-    let out_expr: Box<Expr<SymbolId>> = resolve_expression(in_expr, src, chain)?;
+    let out_expr: Box<Expr<SymbolId>> =
+        resolve_expression(in_expr, src, chain)?;
     Ok(StmtKind::Print(out_expr))
 }
 
@@ -258,7 +265,8 @@ fn resolve_expr_stmt<'table>(
     src: &Span,
     chain: &mut ScopeChain<'table>,
 ) -> Result<StmtKind<SymbolId>, NameError> {
-    let out_expr: Box<Expr<SymbolId>> = resolve_expression(in_expr, src, chain)?;
+    let out_expr: Box<Expr<SymbolId>> =
+        resolve_expression(in_expr, src, chain)?;
     Ok(StmtKind::Expr(out_expr))
 }
 

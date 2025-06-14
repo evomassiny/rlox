@@ -2,7 +2,6 @@ use super::symbols::{StorageKind, SymbolId, SymbolTable};
 use lexer::Span;
 use std::collections::HashMap;
 
-
 /// When we traverse the AST, we end up
 /// encountering 4 kinds of scope,
 /// keeping track of them allow us to
@@ -84,7 +83,9 @@ impl<'table> ScopeChain<'table> {
             Some(scope) => scope.add(name, src, self.symbols),
             // We could append the binding directly into the global scope,
             // _but_ it should have been previously resolved, in a dedicated pass
-            None => unreachable!("the binding '{name}' should have already been resolved")
+            None => unreachable!(
+                "the binding '{name}' should have already been resolved"
+            ),
         };
         symbol_id
     }

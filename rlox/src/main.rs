@@ -78,8 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             panic!("undefined variable '{name}', at l.{0}", src.line)
         }
     };
-    println!("ast: {:?}\n", ast);
-    println!("{}", &ast.symbols);
+    //println!("ast: {:?}\n", ast);
+    //println!("{}", &ast.symbols);
 
     // 4 - type checking
     let _ = type_check(ast);
