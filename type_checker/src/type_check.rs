@@ -62,6 +62,7 @@ impl ConstraintStore {
         todo!()
     }
 
+    /// add a constraint to the store
     pub fn add(&mut self, constraint: Constraint) {
         self.constraints.push(constraint)
     }
@@ -96,6 +97,9 @@ impl ConstraintStore {
 
 }
 
+/// given a binary expression, 
+/// collect the type constraints derived from
+/// their usage.
 fn collect_binary_expression_constraints(
     binary_id: NodeId,
     left: &Expr<SymbolId>,
@@ -105,6 +109,10 @@ fn collect_binary_expression_constraints(
 ) -> Result<(), TypeError> {
     use BinaryExprKind::*;
     use Constraint::*;
+
+    // recursively collect constraints
+    let _ = collect_expression_constraints(left, store)?;
+    let _ = collect_expression_constraints(right, store)?;
 
     match kind {
         // both operands can only be either strings or numbers
@@ -133,9 +141,6 @@ fn collect_expression_constraints<'set>(
     expr: &Expr<SymbolId>,
     store: &'set mut ConstraintStore,
 ) -> Result<(), TypeError> {
-    // TODO:
-    // fill this !
-    //
     use Constraint::*;
     use ExprKind::*;
     match &expr.kind {
@@ -167,6 +172,7 @@ fn collect_expression_constraints<'set>(
                     store.add(IsNum(inner_expr.id));
                 }
             };
+            let _ = collect_expression_constraints(inner_expr, store)?;
         }
         Binary(left, kind, right) => collect_binary_expression_constraints(
             expr.id, left, kind, right, store,
@@ -174,10 +180,13 @@ fn collect_expression_constraints<'set>(
         Logical(left, _kind, right) => {
             // the type of the binary expression itself depends of the evaluation,
             store.add(IsEither(expr.id, left.id, right.id));
+            let _ = collect_expression_constraints(left, store)?;
+            let _ = collect_expression_constraints(right, store)?;
         }
         Grouping(inner_expr) => {
             // the inner node has the exact same type as its child
             store.add(Same(expr.id, inner_expr.id));
+            let _ = collect_expression_constraints(inner_expr, store)?;
         }
         Call(callee_expr, args) => {
             // We known that "callee_expr" is a function.
@@ -187,12 +196,18 @@ fn collect_expression_constraints<'set>(
             // we also know that the call expression
             // has the type of the return value of the expression.
             store.add(ReturnTypeOf(callee_expr.id));
+
+            let _ = collect_expression_constraints(callee_expr, store)?;
+            for arg_expr in args {
+                let _ = collect_expression_constraints(arg_expr, store)?;
+            }
         }
         Assign(bind_name, r_value_expr) => {
             // The assign expression itself is nil
             store.add(IsNil(expr.id));
             // the object can store the type of the `r_value_expr`
             store.add(SymbolCanHoldTypeOf(*bind_name, r_value_expr.id));
+            let _ = collect_expression_constraints(r_value_expr, store)?;
         }
         Variable(bind_name) => {
             // The bind expression itself is nil
@@ -214,7 +229,6 @@ fn collect_expression_constraints<'set>(
             let this_class = store.get_current_class()
                 .ok_or(TypeError::NotInClass)?;
             store.add(IsClass(expr.id, this_class));
-
         }
     };
     Ok(())
