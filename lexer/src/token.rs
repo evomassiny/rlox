@@ -62,7 +62,7 @@ impl TokenKind {
             Some('a') => {
                 if id.next() == Some('n')
                     && id.next() == Some('d')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::And;
                 }
@@ -73,7 +73,7 @@ impl TokenKind {
                     && id.next() == Some('a')
                     && id.next() == Some('s')
                     && id.next() == Some('s')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Class;
                 }
@@ -83,7 +83,7 @@ impl TokenKind {
                 if id.next() == Some('l')
                     && id.next() == Some('s')
                     && id.next() == Some('e')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Else;
                 }
@@ -91,12 +91,12 @@ impl TokenKind {
             // 'for' | 'fun' | 'false'
             Some('f') => match id.next() {
                 Some('o') => {
-                    if id.next() == Some('r') && id.next() == None {
+                    if id.next() == Some('r') && id.next().is_none() {
                         return Self::For;
                     }
                 }
                 Some('u') => {
-                    if id.next() == Some('n') && id.next() == None {
+                    if id.next() == Some('n') && id.next().is_none() {
                         return Self::Fun;
                     }
                 }
@@ -104,7 +104,7 @@ impl TokenKind {
                     if id.next() == Some('l')
                         && id.next() == Some('s')
                         && id.next() == Some('e')
-                        && id.next() == None
+                        && id.next().is_none()
                     {
                         return Self::False;
                     }
@@ -113,7 +113,7 @@ impl TokenKind {
             },
             // 'if'
             Some('i') => {
-                if id.next() == Some('f') && id.next() == None {
+                if id.next() == Some('f') && id.next().is_none() {
                     return Self::If;
                 }
             }
@@ -121,14 +121,14 @@ impl TokenKind {
             Some('n') => {
                 if id.next() == Some('i')
                     && id.next() == Some('l')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Nil;
                 }
             }
             // 'or'
             Some('o') => {
-                if id.next() == Some('r') && id.next() == None {
+                if id.next() == Some('r') && id.next().is_none() {
                     return Self::Or;
                 }
             }
@@ -138,7 +138,7 @@ impl TokenKind {
                     && id.next() == Some('i')
                     && id.next() == Some('n')
                     && id.next() == Some('t')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Print;
                 }
@@ -150,7 +150,7 @@ impl TokenKind {
                     && id.next() == Some('u')
                     && id.next() == Some('r')
                     && id.next() == Some('n')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Return;
                 }
@@ -161,7 +161,7 @@ impl TokenKind {
                     && id.next() == Some('p')
                     && id.next() == Some('e')
                     && id.next() == Some('r')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Super;
                 }
@@ -171,7 +171,7 @@ impl TokenKind {
                 Some('h') => {
                     if id.next() == Some('i')
                         && id.next() == Some('s')
-                        && id.next() == None
+                        && id.next().is_none()
                     {
                         return Self::This;
                     }
@@ -179,7 +179,7 @@ impl TokenKind {
                 Some('r') => {
                     if id.next() == Some('u')
                         && id.next() == Some('e')
-                        && id.next() == None
+                        && id.next().is_none()
                     {
                         return Self::True;
                     }
@@ -190,7 +190,7 @@ impl TokenKind {
             Some('v') => {
                 if id.next() == Some('a')
                     && id.next() == Some('r')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::Var;
                 }
@@ -201,7 +201,7 @@ impl TokenKind {
                     && id.next() == Some('i')
                     && id.next() == Some('l')
                     && id.next() == Some('e')
-                    && id.next() == None
+                    && id.next().is_none()
                 {
                     return Self::While;
                 }

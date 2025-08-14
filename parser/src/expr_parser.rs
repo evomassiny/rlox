@@ -109,18 +109,18 @@ where
     /// which parsing routine we should use to parse the
     /// expression
     fn get_prefix_handler(kind: &TokenKind) -> Option<PrefixParserFn> {
-        match kind {
-            &TokenKind::LeftParen => Some(Self::parse_grouping),
-            &TokenKind::Minus => Some(Self::parse_minus),
-            &TokenKind::Bang => Some(Self::parse_not),
-            &TokenKind::Identifier(_) => Some(Self::parse_variable),
-            &TokenKind::Str(_) => Some(Self::parse_string),
-            &TokenKind::Number(_) => Some(Self::parse_number),
-            &TokenKind::False => Some(Self::parse_false),
-            &TokenKind::Nil => Some(Self::parse_nil),
-            &TokenKind::Super => Some(Self::parse_super),
-            &TokenKind::This => Some(Self::parse_this),
-            &TokenKind::True => Some(Self::parse_true),
+        match *kind {
+            TokenKind::LeftParen => Some(Self::parse_grouping),
+            TokenKind::Minus => Some(Self::parse_minus),
+            TokenKind::Bang => Some(Self::parse_not),
+            TokenKind::Identifier(_) => Some(Self::parse_variable),
+            TokenKind::Str(_) => Some(Self::parse_string),
+            TokenKind::Number(_) => Some(Self::parse_number),
+            TokenKind::False => Some(Self::parse_false),
+            TokenKind::Nil => Some(Self::parse_nil),
+            TokenKind::Super => Some(Self::parse_super),
+            TokenKind::This => Some(Self::parse_this),
+            TokenKind::True => Some(Self::parse_true),
             _ => None,
         }
     }
@@ -149,22 +149,22 @@ where
     /// which parsing routine we should use to parse the
     /// expression if we found the token while parsing a bigger expression
     fn get_infix_handler(kind: &TokenKind) -> Option<InfixParserFn> {
-        match kind {
-            &TokenKind::Equal => Some(Self::parse_assign),
-            &TokenKind::Dot => Some(Self::parse_get_or_set),
-            &TokenKind::LeftParen => Some(Self::parse_call),
-            &TokenKind::Minus => Some(Self::parse_substraction),
-            &TokenKind::Plus => Some(Self::parse_sum),
-            &TokenKind::Slash => Some(Self::parse_division),
-            &TokenKind::Star => Some(Self::parse_product),
-            &TokenKind::BangEqual => Some(Self::parse_not_equal),
-            &TokenKind::EqualEqual => Some(Self::parse_equal),
-            &TokenKind::Greater => Some(Self::parse_greater),
-            &TokenKind::GreaterEqual => Some(Self::parse_greater_equal),
-            &TokenKind::Less => Some(Self::parse_less),
-            &TokenKind::LessEqual => Some(Self::parse_less_equal),
-            &TokenKind::And => Some(Self::parse_and),
-            &TokenKind::Or => Some(Self::parse_or),
+        match *kind {
+            TokenKind::Equal => Some(Self::parse_assign),
+            TokenKind::Dot => Some(Self::parse_get_or_set),
+            TokenKind::LeftParen => Some(Self::parse_call),
+            TokenKind::Minus => Some(Self::parse_substraction),
+            TokenKind::Plus => Some(Self::parse_sum),
+            TokenKind::Slash => Some(Self::parse_division),
+            TokenKind::Star => Some(Self::parse_product),
+            TokenKind::BangEqual => Some(Self::parse_not_equal),
+            TokenKind::EqualEqual => Some(Self::parse_equal),
+            TokenKind::Greater => Some(Self::parse_greater),
+            TokenKind::GreaterEqual => Some(Self::parse_greater_equal),
+            TokenKind::Less => Some(Self::parse_less),
+            TokenKind::LessEqual => Some(Self::parse_less_equal),
+            TokenKind::And => Some(Self::parse_and),
+            TokenKind::Or => Some(Self::parse_or),
             _ => None,
         }
     }

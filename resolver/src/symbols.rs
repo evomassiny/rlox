@@ -34,7 +34,7 @@ impl Symbol {
 
 /// Index a symbol
 /// (new type pattern over usize)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SymbolId(usize);
 
 /// A table of Symbols,
@@ -45,6 +45,12 @@ pub struct SymbolTable {
     // it is wrapped in a Struct which implements
     // indexing, so we can move to some other kind of map if needed.
     pub symbols: Vec<Symbol>,
+}
+
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SymbolTable {
@@ -89,13 +95,13 @@ impl Index<&SymbolId> for SymbolTable {
     type Output = Symbol;
 
     fn index(&self, index: &SymbolId) -> &Self::Output {
-        &self.symbols[(*index).0]
+        &self.symbols[index.0]
     }
 }
 
 impl IndexMut<&SymbolId> for SymbolTable {
     fn index_mut(&mut self, index: &SymbolId) -> &mut Self::Output {
-        &mut self.symbols[(*index).0]
+        &mut self.symbols[index.0]
     }
 }
 

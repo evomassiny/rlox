@@ -5,12 +5,11 @@ mod scopes;
 mod symbols;
 
 pub use resolve::{resolve_names, Ast, NameError};
-use scopes::ScopeChain;
 pub use symbols::{StorageKind, Symbol, SymbolId, SymbolTable};
 
 #[cfg(test)]
 mod resolver {
-    use super::{resolve_names, NameError, StorageKind, Symbol};
+    use super::{resolve_names, StorageKind};
     use lexer::{Lexer, StrPeeker};
     use parser::{Stmt, StmtParser};
 

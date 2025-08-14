@@ -1,6 +1,5 @@
 use crate::arrays::Array;
-use crate::block_headers::{BlockHeader, BlockState};
-use crate::blocks::{Block, BlockError, InBlockPtr, LINE_COUNT};
+use crate::blocks::InBlockPtr;
 use crate::boxed_values::BoxedValue;
 use crate::compactor::{HeapCompactor, LivenessFlag};
 use crate::heap_objects::{Header, Markable, Object};

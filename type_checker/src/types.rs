@@ -16,6 +16,12 @@ pub struct TypeTable {
     types: Vec<Type>,
 }
 
+impl Default for TypeTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypeTable {
     pub fn new() -> Self {
         Self { types: Vec::new() }
@@ -39,12 +45,12 @@ impl Index<&TypeId> for TypeTable {
     type Output = Type;
 
     fn index(&self, index: &TypeId) -> &Self::Output {
-        &self.types[(*index).0]
+        &self.types[index.0]
     }
 }
 
 impl IndexMut<&TypeId> for TypeTable {
     fn index_mut(&mut self, index: &TypeId) -> &mut Self::Output {
-        &mut self.types[(*index).0]
+        &mut self.types[index.0]
     }
 }

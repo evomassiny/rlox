@@ -3,7 +3,6 @@ use crate::heap_objects::{Header, Markable, Object, ObjectRef};
 use crate::memory::MemoryError;
 use crate::values::Value;
 use std::convert::{AsMut, AsRef, Into};
-use std::ptr::addr_of;
 
 /// A `Value` allocated in the runtime heap.
 #[derive(Debug, PartialEq)]

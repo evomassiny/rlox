@@ -15,7 +15,7 @@ such as:
 * constant folding
 * lifetime analysis
 
-Then, somehow come up with an optimal representation of all user-defines types,
+Then, somehow come up with an optimal representation of all user-defined types,
 by turning dict based objects into structs.
 
 Finally, when I've came up with an optimized Control Flow Graph, and an optimal

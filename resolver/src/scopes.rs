@@ -1,4 +1,4 @@
-use super::symbols::{StorageKind, SymbolId, SymbolTable};
+use super::symbols::{SymbolId, SymbolTable};
 use lexer::Span;
 use std::collections::HashMap;
 

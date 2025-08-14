@@ -1,6 +1,4 @@
-use crate::blocks::{
-    BlockOffset, BLOCK_SIZE, LINE_COUNT, LINE_SIZE, LINE_SIZE_BITS,
-};
+use crate::blocks::{BlockOffset, BLOCK_SIZE, LINE_COUNT, LINE_SIZE};
 use crate::heap_objects::Header;
 use std::mem::size_of;
 

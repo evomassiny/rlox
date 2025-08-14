@@ -1,7 +1,7 @@
 use super::scopes::{ScopeChain, ScopeKind};
-use super::symbols::{Symbol, SymbolId, SymbolTable};
+use super::symbols::{SymbolId, SymbolTable};
 use lexer::Span;
-use parser::{Expr, ExprKind, NodeId, Stmt, StmtKind};
+use parser::{Expr, ExprKind, Stmt, StmtKind};
 
 #[derive(Debug)]
 pub enum NameError {
@@ -80,7 +80,7 @@ fn resolve_class_stmt<'table>(
         )?;
         out_methods.push(Stmt {
             kind: method_stmt_kind,
-            span: span,
+            span,
             id,
         });
     }
