@@ -80,72 +80,35 @@ impl SolvedTypes {
 
     /// add a fact, derived from the user source,
     /// check that it's coherent with the previous facts we kwown,
-    /// and use this this new information to derive
+    /// and use this new information to derive new knowledges
     pub fn use_fact(&mut self, fact: &Fact) -> Result<bool, TypeError> {
         use Fact::*;
-        let done = match *fact {
+        let mut consumed = true;
+        match *fact {
             // set `node` as Num
             IsNum(node) => {
-                if let Some(ty) = self.solved_nodes.get(&node) {
-                    if *ty != ConcreteType::Num {
-                        return Err(TypeError::ShouldBe(
-                            node,
-                            ConcreteType::Num,
-                        ));
-                    }
-                }
-                self.solved_nodes.insert(node, ConcreteType::Num);
-                true
+                let _ =
+                    self.check_or_set_type_for_node(node, ConcreteType::Num)?;
             }
             // set `node` as Str
             IsStr(node) => {
-                if let Some(ty) = self.solved_nodes.get(&node) {
-                    if *ty != ConcreteType::Str {
-                        return Err(TypeError::ShouldBe(
-                            node,
-                            ConcreteType::Str,
-                        ));
-                    }
-                }
-                self.solved_nodes.insert(node, ConcreteType::Str);
-                true
+                let _ =
+                    self.check_or_set_type_for_node(node, ConcreteType::Str)?;
             }
             // set `node` as bool
             IsBool(node) => {
-                if let Some(ty) = self.solved_nodes.get(&node) {
-                    if *ty != ConcreteType::Bool {
-                        return Err(TypeError::ShouldBe(
-                            node,
-                            ConcreteType::Bool,
-                        ));
-                    }
-                }
-                self.solved_nodes.insert(node, ConcreteType::Bool);
-                true
+                let _ =
+                    self.check_or_set_type_for_node(node, ConcreteType::Bool)?;
             }
             // set `node` as Nil
             IsNil(node) => {
-                if let Some(ty) = self.solved_nodes.get(&node) {
-                    if *ty != ConcreteType::Nil {
-                        return Err(TypeError::ShouldBe(
-                            node,
-                            ConcreteType::Nil,
-                        ));
-                    }
-                }
-                self.solved_nodes.insert(node, ConcreteType::Nil);
-                true
+                let _ =
+                    self.check_or_set_type_for_node(node, ConcreteType::Nil)?;
             }
             // set `node` as Class `class_name`
             IsClass(node, class_name) => {
                 let node_type = ConcreteType::Class(class_name);
-                if let Some(ty) = self.solved_nodes.get(&node) {
-                    if *ty != node_type {
-                        return Err(TypeError::ShouldBe(node, ty.clone()));
-                    }
-                }
-                self.solved_nodes.insert(node, node_type);
-                true
+                let _ = self.check_or_set_type_for_node(node, node_type)?;
             }
             // When we have an exact match between 2 nodes,
             // we can derive one type from the other, but we also
@@ -159,17 +122,17 @@ impl SolvedTypes {
                         if *ty_a != *ty_b {
                             return Err(TypeError::NotSame(node_a, node_b));
                         }
-                        true
                     }
                     (Some(ty_a), None) => {
                         self.solved_nodes.insert(node_b, ty_a.clone());
-                        true
                     }
                     (None, Some(ty_b)) => {
                         self.solved_nodes.insert(node_a, ty_b.clone());
-                        true
                     }
-                    (None, None) => false,
+                    (None, None) => {
+                        // we haven't learn anything.
+                        consumed = false;
+                    }
                 }
             }
             // add type to variants of `Symbols`
@@ -191,14 +154,85 @@ impl SolvedTypes {
                         None => node_ty.clone(),
                     };
                     self.solved_symbol.insert(symbol, ty);
-                    true
                 } else {
-                    false
+                    consumed = false;
                 }
             }
-            _ => false,
+            // assert that the type of `node` is either:
+            // * an union of Num | Str,
+            // * Num,
+            // * or Str
+            EitherNumOrStr(node) => {
+                if let Some(node_ty) = self.solved_nodes.get(&node) {
+                    let error = TypeError::ShouldBe(
+                        node,
+                        ConcreteType::Union(vec![
+                            ConcreteType::Num,
+                            ConcreteType::Str,
+                        ]),
+                    );
+                    match node_ty {
+                        ConcreteType::Num | ConcreteType::Str => {}
+                        ConcreteType::Union(variants) => {
+                            let mut required: usize = 0;
+                            if variants.contains(&ConcreteType::Num) {
+                                required += 1;
+                            }
+                            if variants.contains(&ConcreteType::Str) {
+                                required += 1;
+                            }
+                            if required != variants.len() {
+                                return Err(error);
+                            }
+                        }
+                        _ => {
+                            return Err(error);
+                        }
+                    }
+                } else {
+                    consumed = false;
+                }
+            }
+            // propagate type of symbol into node.
+            HasTypeOfSymbol(node, symbol) => {
+                match (
+                    self.solved_nodes.get(&node),
+                    self.solved_symbol.get(&symbol),
+                ) {
+                    (Some(ty_node), Some(ty_symbol)) => {
+                        if *ty_node != *ty_symbol {
+                            return Err(TypeError::ShouldBe(
+                                node,
+                                ty_symbol.clone(),
+                            ));
+                        }
+                    }
+                    (None, Some(ty_symbol)) => {
+                        self.solved_nodes.insert(node, ty_symbol.clone());
+                    }
+                    (_, None) => {
+                        // we haven't learn anything.
+                        consumed = false;
+                    }
+                }
+            }
+            _ => consumed = false,
         };
-        Ok(done)
+        Ok(consumed)
+    }
+
+    fn check_or_set_type_for_node(
+        &mut self,
+        node: NodeId,
+        target_ty: ConcreteType,
+    ) -> Result<(), TypeError> {
+        if let Some(ty) = self.solved_nodes.get(&node) {
+            if *ty != target_ty {
+                return Err(TypeError::ShouldBe(node, target_ty));
+            }
+        }
+        self.solved_nodes.insert(node, target_ty);
+        Ok(())
     }
 }
 
@@ -304,22 +338,22 @@ fn collect_binary_expression_facts(
         // both operands can only be either strings or numbers
         // _and_ are equivalent
         Add => {
-            solver.add_fact(Same(binary_id, left.id));
-            solver.add_fact(Same(binary_id, right.id));
-            solver.add_fact(Same(left.id, right.id));
-            solver.add_fact(EitherNumOrStr(left.id));
-            solver.add_fact(EitherNumOrStr(right.id));
+            let _ = solver.add_fact(Same(binary_id, left.id));
+            let _ = solver.add_fact(Same(binary_id, right.id));
+            let _ = solver.add_fact(Same(left.id, right.id));
+            let _ = solver.add_fact(EitherNumOrStr(left.id));
+            let _ = solver.add_fact(EitherNumOrStr(right.id));
         }
         // both operands are numbers
         LessEqual | Less | GreaterEqual | Greater | Sub | Div | Mul => {
-            solver.add_fact(IsNum(left.id));
-            solver.add_fact(IsNum(right.id));
-            solver.add_fact(IsBool(binary_id));
+            let _ = solver.add_fact(IsNum(left.id));
+            let _ = solver.add_fact(IsNum(right.id));
+            let _ = solver.add_fact(IsBool(binary_id));
         }
         // both operands are equivalents
         NotEqual | Equal => {
-            solver.add_fact(Same(left.id, right.id));
-            solver.add_fact(IsBool(binary_id));
+            let _ = solver.add_fact(Same(left.id, right.id));
+            let _ = solver.add_fact(IsBool(binary_id));
         }
     }
     Ok(())
@@ -340,7 +374,7 @@ fn collect_expression_facts(
                 LiteralKind::Num(..) => solver.add_fact(IsNum(expr.id))?,
                 LiteralKind::Str(..) => solver.add_fact(IsStr(expr.id))?,
                 LiteralKind::Bool(..) => solver.add_fact(IsBool(expr.id))?,
-                LiteralKind::Nil => {}
+                LiteralKind::Nil => solver.add_fact(IsNil(expr.id))?,
             };
         }
         // 2 cases:
@@ -352,12 +386,12 @@ fn collect_expression_facts(
                     // the `!exp` is a boolean
                     // anything can be casted as a boolean
                     // so it doesn't give us any more information
-                    solver.add_fact(IsBool(expr.id))?;
+                    let _ = solver.add_fact(IsBool(expr.id))?;
                 }
                 UnaryExprKind::Minus => {
                     // both the current expression and the innner one are numbers
-                    solver.add_fact(IsNum(expr.id))?;
-                    solver.add_fact(IsNum(inner_expr.id))?;
+                    let _ = solver.add_fact(IsNum(expr.id))?;
+                    let _ = solver.add_fact(IsNum(inner_expr.id))?;
                 }
             };
             collect_expression_facts(inner_expr, solver)?;
@@ -367,23 +401,23 @@ fn collect_expression_facts(
         }
         Logical(left, _kind, right) => {
             // the type of the binary expression itself depends of the evaluation,
-            solver.add_fact(IsEither(expr.id, left.id, right.id))?;
+            let _ = solver.add_fact(IsEither(expr.id, left.id, right.id))?;
             collect_expression_facts(left, solver)?;
             collect_expression_facts(right, solver)?;
         }
         Grouping(inner_expr) => {
             // the inner node has the exact same type as its child
-            solver.add_fact(Same(expr.id, inner_expr.id));
+            let _ = solver.add_fact(Same(expr.id, inner_expr.id));
             collect_expression_facts(inner_expr, solver)?;
         }
         Call(callee_expr, args) => {
             // We known that "callee_expr" is a function.
             // which should be callable with those args
             let arg_ids = args.iter().map(|arg| arg.id).collect();
-            solver.add_fact(IsCallableWith(callee_expr.id, arg_ids))?;
+            let _ = solver.add_fact(IsCallableWith(callee_expr.id, arg_ids))?;
             // we also know that the call expression
             // has the type of the return value of the expression.
-            solver.add_fact(ReturnTypeOf(callee_expr.id))?;
+            let _ = solver.add_fact(ReturnTypeOf(callee_expr.id))?;
 
             collect_expression_facts(callee_expr, solver)?;
             for arg_expr in args {
@@ -392,32 +426,30 @@ fn collect_expression_facts(
         }
         Assign(bind_name, r_value_expr) => {
             // The assign expression itself is nil
-            solver.add_fact(IsNil(expr.id))?;
+            let _ = solver.add_fact(IsNil(expr.id))?;
             // the object can store the type of the `r_value_expr`
             solver
                 .add_fact(SymbolCanHoldTypeOf(*bind_name, r_value_expr.id))?;
             collect_expression_facts(r_value_expr, solver)?;
         }
         Variable(bind_name) => {
-            // The bind expression itself is nil
-            solver.add_fact(IsNil(expr.id))?;
-            // variable has the type of the r_value
-            solver.add_fact(HasTypeOfSymbol(expr.id, *bind_name))?;
+            // expression has the type of the symbol
+            let _ = solver.add_fact(HasTypeOfSymbol(expr.id, *bind_name))?;
         }
         Get(object_expr, attr_name) => {
-            solver.add_fact(IsObjectWithAttr(
+            let _ = solver.add_fact(IsObjectWithAttr(
                 object_expr.id,
                 attr_name.clone(),
             ))?;
             collect_expression_facts(object_expr, solver)?;
-            solver.add_fact(HasTypeOfObjAttr(
+            let _ = solver.add_fact(HasTypeOfObjAttr(
                 expr.id,
                 object_expr.id,
                 attr_name.clone(),
             ))?;
         }
         Set(object_expr, attr_name, r_value_expr) => {
-            solver.add_fact(IsObjectWithAttr(
+            let _ = solver.add_fact(IsObjectWithAttr(
                 object_expr.id,
                 attr_name.clone(),
             ))?;
@@ -428,8 +460,8 @@ fn collect_expression_facts(
             let super_class = solver
                 .get_current_super_class()
                 .ok_or(TypeError::NoSuperClass)?;
-            solver.add_fact(IsClass(expr.id, super_class))?;
-            solver.add_fact(HasTypeOfClassAttr(
+            let _ = solver.add_fact(IsClass(expr.id, super_class))?;
+            let _ = solver.add_fact(HasTypeOfClassAttr(
                 expr.id,
                 super_class,
                 attr_name.clone(),
@@ -438,7 +470,7 @@ fn collect_expression_facts(
         This => {
             let this_class =
                 solver.get_current_class().ok_or(TypeError::NotInClass)?;
-            solver.add_fact(IsClass(expr.id, this_class))?;
+            let _ = solver.add_fact(IsClass(expr.id, this_class))?;
         }
     };
     Ok(())
@@ -477,7 +509,7 @@ fn collect_facts_in_stmt(
         Return(maybe_expr) => todo!("Return"),
         Var(name, intializer) => {
             collect_expression_facts(intializer, set)?;
-            set.add_fact(SymbolCanHoldTypeOf(*name, intializer.id))?;
+            let _ = set.add_fact(SymbolCanHoldTypeOf(*name, intializer.id))?;
         }
         While(condition, body) => todo!("While loops"),
         For(maybe_initializer, maybe_condition, maybe_increment, body) => {
@@ -505,8 +537,24 @@ pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     //   and this type implements `add`
     // * then we actually solve thoses facts
     let facts = collect_facts(&untyped_ast)?;
+    let nb_of_facts = &facts.facts.len();
+    println!("remains {nb_of_facts:?} facts.");
     for fact in &facts.facts {
         println!("{fact:?}");
+    }
+    println!("");
+
+    let nb_of_nodes = &facts.solved_types.solved_nodes.len();
+    println!("solved {nb_of_nodes:?} nodes.");
+    for node in &facts.solved_types.solved_nodes {
+        println!("{node:?}");
+    }
+    println!("");
+
+    let nb_of_symbols = &facts.solved_types.solved_symbol.len();
+    println!("solved {nb_of_symbols:?} symbols.");
+    for node in &facts.solved_types.solved_symbol {
+        println!("{node:?}");
     }
     let types = TypeTable::new();
     todo!()

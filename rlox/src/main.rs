@@ -82,7 +82,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //println!("{}", &ast.symbols);
 
     // 4 - type checking
-    let _ = type_check(ast);
+    let res = type_check(ast);
+    dbg!(res);
 
     Ok(())
 }
