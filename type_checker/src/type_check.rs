@@ -37,9 +37,11 @@ pub enum Fact {
     // handle `a = b or c`,
     // `a` can have both type depending of the runtime value
     IsEither(NodeId, NodeId, NodeId),
-    ReturnTypeOf(NodeId),
+    // expression node,  call node
+    ReturnTypeOf(NodeId, NodeId),
     // `a = 1` means `a` has the same type as `1`
     SymbolCanHoldTypeOf(SymbolId, NodeId),
+    SymbolCanHoldType(SymbolId, ConcreteType),
     HasTypeOfSymbol(NodeId, SymbolId),
     // Expression (0) as the type of the attribute (2)
     // from the expression (1)
@@ -114,108 +116,31 @@ impl SolvedTypes {
             // we can derive one type from the other, but we also
             // need to check that both are actually equals
             Same(node_a, node_b) => {
-                match (
-                    self.solved_nodes.get(&node_a),
-                    self.solved_nodes.get(&node_b),
-                ) {
-                    (Some(ty_a), Some(ty_b)) => {
-                        if *ty_a != *ty_b {
-                            return Err(TypeError::NotSame(node_a, node_b));
-                        }
-                    }
-                    (Some(ty_a), None) => {
-                        self.solved_nodes.insert(node_b, ty_a.clone());
-                    }
-                    (None, Some(ty_b)) => {
-                        self.solved_nodes.insert(node_a, ty_b.clone());
-                    }
-                    (None, None) => {
-                        // we haven't learn anything.
-                        consumed = false;
-                    }
-                }
+                consumed = self.copy_node_type(node_a, node_b)?;
             }
             // add type to variants of `Symbols`
             SymbolCanHoldTypeOf(symbol, node) => {
-                if let Some(node_ty) = self.solved_nodes.get(&node) {
-                    let ty = match self.solved_symbol.remove(&symbol) {
-                        Some(ConcreteType::Union(mut variants)) => {
-                            if !variants.contains(node_ty) {
-                                variants.push(node_ty.clone());
-                            }
-                            ConcreteType::Union(variants)
-                        }
-                        Some(sym_ty) => {
-                            let mut variants = Vec::new();
-                            variants.push(node_ty.clone());
-                            variants.push(sym_ty);
-                            ConcreteType::Union(variants)
-                        }
-                        None => node_ty.clone(),
-                    };
-                    self.solved_symbol.insert(symbol, ty);
-                } else {
-                    consumed = false;
-                }
+                consumed = self
+                    .add_type_of_node_to_symbol_type_variants(symbol, node)?;
+            }
+            // add type to variants of `Symbols`
+            SymbolCanHoldType(symbol, ref ty) => {
+                self.add_type_variant_to_symbol(symbol, ty.clone());
             }
             // assert that the type of `node` is either:
             // * an union of Num | Str,
             // * Num,
             // * or Str
             EitherNumOrStr(node) => {
-                if let Some(node_ty) = self.solved_nodes.get(&node) {
-                    let error = TypeError::ShouldBe(
-                        node,
-                        ConcreteType::Union(vec![
-                            ConcreteType::Num,
-                            ConcreteType::Str,
-                        ]),
-                    );
-                    match node_ty {
-                        ConcreteType::Num | ConcreteType::Str => {}
-                        ConcreteType::Union(variants) => {
-                            let mut required: usize = 0;
-                            if variants.contains(&ConcreteType::Num) {
-                                required += 1;
-                            }
-                            if variants.contains(&ConcreteType::Str) {
-                                required += 1;
-                            }
-                            if required != variants.len() {
-                                return Err(error);
-                            }
-                        }
-                        _ => {
-                            return Err(error);
-                        }
-                    }
-                } else {
-                    consumed = false;
-                }
+                consumed = self.assert_node_is_str_or_num_or_both(node)?;
             }
             // propagate type of symbol into node.
             HasTypeOfSymbol(node, symbol) => {
-                match (
-                    self.solved_nodes.get(&node),
-                    self.solved_symbol.get(&symbol),
-                ) {
-                    (Some(ty_node), Some(ty_symbol)) => {
-                        if *ty_node != *ty_symbol {
-                            return Err(TypeError::ShouldBe(
-                                node,
-                                ty_symbol.clone(),
-                            ));
-                        }
-                    }
-                    (None, Some(ty_symbol)) => {
-                        self.solved_nodes.insert(node, ty_symbol.clone());
-                    }
-                    (_, None) => {
-                        // we haven't learn anything.
-                        consumed = false;
-                    }
-                }
+                consumed = self.set_node_type_to_symbol(node, symbol)?;
             }
+            //ReturnTypeOf(node, call_node) => {
+            //todo!();
+            //}
             _ => consumed = false,
         };
         Ok(consumed)
@@ -233,6 +158,143 @@ impl SolvedTypes {
         }
         self.solved_nodes.insert(node, target_ty);
         Ok(())
+    }
+
+    /// If we know the type of `symbol`,
+    /// progagate it to `node`.
+    /// When we know both, asserts that they are coherents.
+    /// Return true if we've learnt something.
+    fn set_node_type_to_symbol(
+        &mut self,
+        node: NodeId,
+        symbol: SymbolId,
+    ) -> Result<bool, TypeError> {
+        let mut consumed = true;
+        match (
+            self.solved_nodes.get(&node),
+            self.solved_symbol.get(&symbol),
+        ) {
+            (Some(ty_node), Some(ty_symbol)) => {
+                if *ty_node != *ty_symbol {
+                    return Err(TypeError::ShouldBe(node, ty_symbol.clone()));
+                }
+            }
+            (None, Some(ty_symbol)) => {
+                self.solved_nodes.insert(node, ty_symbol.clone());
+            }
+            (_, None) => {
+                // we haven't learn anything.
+                consumed = false;
+            }
+        }
+        Ok(consumed)
+    }
+
+    /// Assert that the node type is a Str or Num, or an union of both.
+    /// Return true if we've learnt something.
+    fn assert_node_is_str_or_num_or_both(
+        &mut self,
+        node: NodeId,
+    ) -> Result<bool, TypeError> {
+        let mut consumed = true;
+        if let Some(node_ty) = self.solved_nodes.get(&node) {
+            let error = TypeError::ShouldBe(
+                node,
+                ConcreteType::Union(vec![ConcreteType::Num, ConcreteType::Str]),
+            );
+            match node_ty {
+                ConcreteType::Num | ConcreteType::Str => {}
+                ConcreteType::Union(variants) => {
+                    let mut required: usize = 0;
+                    if variants.contains(&ConcreteType::Num) {
+                        required += 1;
+                    }
+                    if variants.contains(&ConcreteType::Str) {
+                        required += 1;
+                    }
+                    if required != variants.len() {
+                        return Err(error);
+                    }
+                }
+                _ => {
+                    return Err(error);
+                }
+            }
+        } else {
+            consumed = false;
+        }
+        Ok(consumed)
+    }
+
+    /// Add the type of `node` to the possible types of `symbol`.
+    fn add_type_variant_to_symbol(
+        &mut self,
+        symbol: SymbolId,
+        symbol_ty: ConcreteType,
+    ) {
+        let ty = match self.solved_symbol.remove(&symbol) {
+            Some(ConcreteType::Union(mut variants)) => {
+                if !variants.contains(&symbol_ty) {
+                    variants.push(symbol_ty);
+                }
+                ConcreteType::Union(variants)
+            }
+            Some(sym_ty) => {
+                let mut variants = Vec::new();
+                variants.push(symbol_ty);
+                variants.push(sym_ty);
+                ConcreteType::Union(variants)
+            }
+            None => symbol_ty,
+        };
+        self.solved_symbol.insert(symbol, ty);
+    }
+
+    /// Add the type of `node` to the possible types of `symbol`.
+    fn add_type_of_node_to_symbol_type_variants(
+        &mut self,
+        symbol: SymbolId,
+        node: NodeId,
+    ) -> Result<bool, TypeError> {
+        let mut consumed = true;
+        if let Some(node_ty) = self.solved_nodes.get(&node) {
+            self.add_type_variant_to_symbol(symbol, node_ty.clone());
+        } else {
+            consumed = false;
+        }
+
+        Ok(consumed)
+    }
+
+    // if we know one type among the two nodes, copy one to the other.
+    // If both are defined, assert that they are equals.
+    fn copy_node_type(
+        &mut self,
+        node_a: NodeId,
+        node_b: NodeId,
+    ) -> Result<bool, TypeError> {
+        let mut consumed = true;
+        match (
+            self.solved_nodes.get(&node_a),
+            self.solved_nodes.get(&node_b),
+        ) {
+            (Some(ty_a), Some(ty_b)) => {
+                if *ty_a != *ty_b {
+                    return Err(TypeError::NotSame(node_a, node_b));
+                }
+            }
+            (Some(ty_a), None) => {
+                self.solved_nodes.insert(node_b, ty_a.clone());
+            }
+            (None, Some(ty_b)) => {
+                self.solved_nodes.insert(node_a, ty_b.clone());
+            }
+            (None, None) => {
+                // we haven't learn anything.
+                consumed = false;
+            }
+        }
+        Ok(consumed)
     }
 }
 
@@ -417,7 +479,7 @@ fn collect_expression_facts(
             let _ = solver.add_fact(IsCallableWith(callee_expr.id, arg_ids))?;
             // we also know that the call expression
             // has the type of the return value of the expression.
-            let _ = solver.add_fact(ReturnTypeOf(callee_expr.id))?;
+            let _ = solver.add_fact(ReturnTypeOf(expr.id, callee_expr.id))?;
 
             collect_expression_facts(callee_expr, solver)?;
             for arg_expr in args {
@@ -493,6 +555,15 @@ fn collect_facts_in_stmt(
         }
         Class(name, maybe_super_name, methods) => {
             set.set_current_class(name, maybe_super_name);
+            // add the class constructor
+            // function type.
+            let _ = set.add_fact(SymbolCanHoldType(
+                *name,
+                ConcreteType::Callable {
+                    args_ty: vec![],
+                    return_ty: Box::new(ConcreteType::Class(*name)),
+                },
+            ))?;
             for method in methods {
                 collect_facts_in_stmt(method, set)?;
             }
