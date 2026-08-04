@@ -53,6 +53,14 @@ pub enum StmtKind<Symbol> {
         Option<Box<Expr<Symbol>>>,
         Box<Stmt<Symbol>>,
     ),
+    /// Single Assigment "phi" denotation,
+    /// It does not translate to an actual value,
+    /// a = phi(a1, a2) means 
+    /// "pick `a1` or `a2`".
+    /// This is an artifact of the the compilation process,
+    /// it is not present in the original source code.
+    /// We "fill" those in the `SSA` pass.
+    Phi(Symbol, Vec<Symbol>),
 }
 
 /// an Expression

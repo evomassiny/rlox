@@ -401,6 +401,7 @@ fn resolve_names_in_stmt<'table>(
                 chain,
             )?
         }
+        Phi(_, _) => unreachable!("We build those nodes in a later pass (ssa).")
     };
     Ok(Stmt {
         kind: out_kind,

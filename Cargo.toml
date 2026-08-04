@@ -6,5 +6,7 @@ members = [
   "type_checker",
   "resolver",
   "rlox", 
+  "ssa", 
   #"control_flow_graph",
 ]
+workspace.resolver = "3"

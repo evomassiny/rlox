@@ -9,7 +9,7 @@ The type checker does 2 main passes:
 1. firts it collects all the type constraints it can see, 
 
 for instance, if `var a = 1 + b;` then we know that:
-* `a` as the same type as the expression `1 + b`
+* `a` has the same type as the expression `1 + b`
 * `1 + b` is either a string of a number (only types that supports addition)
 * `1 + b` has the same type as `1` (because addition preserves type)
 * `1 + b` has the same type as `b` (same)
@@ -18,3 +18,19 @@ for instance, if `var a = 1 + b;` then we know that:
 
 2. then, to actually solve those constraints, my current plan is to use the W algorithm (Hindley-Milner),
 but I'm not entirely sure that it can be done.
+
+# issues:
+
+If I want to type:
+```lox
+var a = 1;
+var b = a + a;
+a = "string";
+```
+
+* `a` can store either a number or a string;
+* `b` can only be a number.
+
+If I define `type of b` as a function of `type of a`, i may end up with
+type(`b`) = `number | str`, even if `b` can never be a `str`.
+For this reason, we need to run an SSA pass before this one.

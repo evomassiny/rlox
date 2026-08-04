@@ -120,8 +120,7 @@ impl SolvedTypes {
             }
             // add type to variants of `Symbols`
             SymbolCanHoldTypeOf(symbol, node) => {
-                consumed = self
-                    .add_type_of_node_to_symbol_type_variants(symbol, node)?;
+                consumed = self.add_type_of_node_to_symbol_type_variants(symbol, node)?;
             }
             // add type to variants of `Symbols`
             SymbolCanHoldType(symbol, ref ty) => {
@@ -139,7 +138,7 @@ impl SolvedTypes {
                 consumed = self.set_node_type_to_symbol(node, symbol)?;
             }
             //ReturnTypeOf(node, call_node) => {
-            //todo!();
+                //consumed = self.set_return_type_to_node(node, call_node)?;
             //}
             _ => consumed = false,
         };
@@ -245,7 +244,7 @@ impl SolvedTypes {
                 variants.push(sym_ty);
                 ConcreteType::Union(variants)
             }
-            None => symbol_ty,
+            None => symbol_ty
         };
         self.solved_symbol.insert(symbol, ty);
     }
@@ -557,13 +556,17 @@ fn collect_facts_in_stmt(
             set.set_current_class(name, maybe_super_name);
             // add the class constructor
             // function type.
-            let _ = set.add_fact(SymbolCanHoldType(
-                *name,
-                ConcreteType::Callable {
-                    args_ty: vec![],
-                    return_ty: Box::new(ConcreteType::Class(*name)),
-                },
-            ))?;
+            let _ = set.add_fact(
+                SymbolCanHoldType(
+                    *name,
+                    ConcreteType::Callable{
+                        args_ty: vec![],
+                        return_ty: Box::new(
+                            ConcreteType::Class(*name)
+                        )
+                    }
+                )
+            )?;
             for method in methods {
                 collect_facts_in_stmt(method, set)?;
             }
@@ -586,6 +589,7 @@ fn collect_facts_in_stmt(
         For(maybe_initializer, maybe_condition, maybe_increment, body) => {
             todo!("For loops")
         }
+        Phi(_, _) => todo!("Phi")
     };
     Ok(())
 }
@@ -603,7 +607,7 @@ fn collect_facts(ast: &Ast) -> Result<TypeSolver, TypeError> {
 
 pub fn type_check(untyped_ast: Ast) -> Result<TypedAst, TypeError> {
     // done in two part:
-    // * first we collect a bunch of facts for each type,
+    // * first we collect a bunch of facts for each types,
     //   for instance `a + c` means `a` and `c` are of the same type,
     //   and this type implements `add`
     // * then we actually solve thoses facts
