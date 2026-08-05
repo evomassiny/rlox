@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4 - type checking
     let res = type_check(ast);
-    dbg!(res);
+    let _ = dbg!(res);
 
     Ok(())
 }

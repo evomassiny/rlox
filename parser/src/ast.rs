@@ -8,6 +8,8 @@
 /// (variable bindings names), in the first stage of the compiler,
 /// we use simple `String`s, after performing the name resolution,
 /// we switch to references to a dedicated type (see `resolver::symbols`).
+/// After the Static Single Assigment pass, we switch to yet another
+/// dedicated types (see `ssa::SsaId`).
 use lexer::Span;
 
 /// Identify an AST Node, (statements and expression alike).
